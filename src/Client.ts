@@ -39,7 +39,7 @@ export type Channel<T extends State> = {
     schema: z.ZodSchema<T>;
 }
 
-const channelPrefix = "ch:";
+const channelPrefix = "ch-";
 
 export class StateClient {
     protected socket: Socket;
@@ -51,7 +51,9 @@ export class StateClient {
         this.socket = io(serverUrl);
 	}
     private sendStateMessage<T extends State>(channel: Channel<T>, message: StateMessage<T>) {
+        // console.log("Sending message", message, "on channel", channelPrefix+channel.name);
         this.socket.emit(channelPrefix+channel.name, message);
+        console.log("Sent message on channel", channelPrefix+channel.name);
     }
     private sendRequestFullStateMessage<T extends State>(channel: Channel<T>) {
         this.sendStateMessage(channel, {requestFullState: true, timestamp: Date.now(), sender: this.socket.id});
@@ -63,15 +65,16 @@ export class StateClient {
         // @ts-ignore TODO: Fix this. Functional but not type safe!
         this.sendStateMessage(channel, {modified: state, deleted: {}, timestamp: Date.now(), sender: this.socket.id});
     }
-    addState<T extends State>(channel: Channel<T>, handler?: (state: T) => void): StateClient {
+    addStateChannel<T extends State>(channel: Channel<T>, handler?: (state: T) => void): StateClient {
         const eventName = channelPrefix+channel.name;
         this.channelMap.set(eventName, channel.schema);
         this.stateMap.set(eventName, {});
         this.socket.on(eventName, (message: StateMessage<T>) => {
+            console.log("Received message", message, "on channel", eventName);
             // Ignore messages from self
-            if (message.sender === this.socket.id) {
-                return;
-            }
+            // if (message.sender === this.socket.id) {
+            //     return;
+            // }
 
             // Validate the message - in the sense that it is a valid message type
             const validMessage = messageTypesSchema.safeParse(message).success;
@@ -102,6 +105,7 @@ export class StateClient {
                 this.statesValid.set(eventName, false);
             }
         });
+        console.log("Listening on channel", eventName);
         return this;
     }
     updateState<T extends State>(channel: Channel<T>, state: T) {
@@ -116,7 +120,21 @@ export class StateClient {
         }
         // Only emit if there are changes
         if (Object.keys(diffResult.modified).length > 0) {
-            this.sendStateMessage(channel, {...diffResult, timestamp: Date.now(), sender: "client"});
+            this.stateMap.set(channelPrefix+channel.name, state);
+            this.sendStateMessage(channel, {...diffResult, timestamp: Date.now(), sender: this.socket.id});
         }
+    }
+    getState<T extends State>(channel: Channel<T>): T {
+        const currentState = this.stateMap.get(channelPrefix+channel.name);
+        if (currentState === undefined) {
+            throw new Error("Channel not found");
+        }
+        if (!this.statesValid.get(channelPrefix+channel.name)) {
+            throw new Error("State is not valid");
+        }
+        return currentState as T;
+    }
+    stop() {
+        this.socket.close();
     }
 }
