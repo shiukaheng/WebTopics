@@ -1,9 +1,7 @@
 import { cloneDeep, isEqual } from 'lodash';
-import { StateClient } from './Client';
+import { JSONObject } from './State';
 
-// State type - any object with any properties
-type Primitives = string | number | boolean | null;
-export type State = { [key: string]: Primitives | State | (Primitives | State)[] };
+// TODO: Fix types!!!
 
 // RecursiveNull - makes all properties of an object null recursively, 
 // except for array properties, which will be replaced by one null element
@@ -50,7 +48,7 @@ function valueType(value: any): ValueType {
 }
 
 // diff - the diff function, takes two objects and returns a DiffResult
-export function diff<T extends State, U extends State>(oldState: T, newState: U): DiffResult<T> {
+export function diff<T extends JSONObject, U extends JSONObject>(oldState: T, newState: U): DiffResult<T> {
     const modified: RecursivePartial<T> = {} as RecursivePartial<T>;
     const deleted: RecursivePartial<RecursiveNull<T>> = {} as RecursivePartial<RecursiveNull<T>>;
     // Union of all keys in both objects
@@ -78,7 +76,7 @@ export function diff<T extends State, U extends State>(oldState: T, newState: U)
                 }
             } else if (oldType === 'object') {
                 // We need to recurse
-                const subDiff = diff(oldState[key as keyof T] as State, newState[key as keyof U] as State);
+                const subDiff = diff(oldState[key as keyof T] as JSONObject, newState[key as keyof U] as JSONObject);
                 // Check if subDiff has deletions
                 if (Object.keys(subDiff.deleted).length > 0) {
                     // @ts-ignore - same as above
@@ -99,7 +97,7 @@ export function diff<T extends State, U extends State>(oldState: T, newState: U)
 }
 
 // Recursively delete in state using delete object
-function deleteInPlace<T extends State>(state: T, deleteObject: RecursivePartial<RecursiveNull<T>>) {
+function deleteInPlace<T extends JSONObject>(state: T, deleteObject: RecursivePartial<RecursiveNull<T>>) {
     for (const key of Object.keys(deleteObject)) {
         const value = deleteObject[key];
         if (value === null) {
@@ -107,20 +105,20 @@ function deleteInPlace<T extends State>(state: T, deleteObject: RecursivePartial
             delete state[key];
         } else {
             // @ts-ignore - we are sure that the key exists in the state
-            deleteInPlace(state[key] as State, value);
+            deleteInPlace(state[key] as JSONObject, value);
         }
     }
 }
 
 // merge - takes an object and a diff to recreate the new object
-export function mergeDiffInPlace<T extends State>(state: T, diff: DiffResult<T>) {
+export function mergeDiffInPlace<T extends JSONObject>(state: T, diff: DiffResult<T>) {
     // Merge the "modified" object into the state
     Object.assign(state, diff.modified);
     // Delete the "deleted" properties from the state
     deleteInPlace(state, diff.deleted);
 }
 
-export function mergeDiff<T extends State>(state: T, diff: DiffResult<T>): State {
+export function mergeDiff<T extends JSONObject>(state: T, diff: DiffResult<T>): JSONObject {
     // Deep clone the state
     const newState = cloneDeep(state);
     // Merge the diff into the new state
