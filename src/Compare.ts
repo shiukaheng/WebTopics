@@ -1,7 +1,9 @@
-import { isEqual } from 'lodash';
+import { cloneDeep, isEqual } from 'lodash';
+import { StateClient } from './Client';
 
 // State type - any object with any properties
-export type State = { [key: string]: string | number | boolean | State | State[] };
+type Primitives = string | number | boolean | null;
+export type State = { [key: string]: Primitives | State | (Primitives | State)[] };
 
 // RecursiveNull - makes all properties of an object null recursively, 
 // except for array properties, which will be replaced by one null element
@@ -19,7 +21,7 @@ export type RecursiveNull<T> =
 // except for array properties, which will be optional but not recursively optional
 export type RecursivePartial<T> =
     // If T is a primitive, return T
-    T extends string | number | boolean ? T :
+    T extends string | number | boolean | null ? T :
     // If T is an array, keep it as is
     T extends Array<infer U> ? T :
     // If T is an object, make all properties optional recursively
@@ -96,4 +98,32 @@ export function diff<T extends State, U extends State>(oldState: T, newState: U)
     return { modified, deleted };
 }
 
+// Recursively delete in state using delete object
+function deleteInPlace<T extends State>(state: T, deleteObject: RecursivePartial<RecursiveNull<T>>) {
+    for (const key of Object.keys(deleteObject)) {
+        const value = deleteObject[key];
+        if (value === null) {
+            // @ts-ignore - we are sure that the key exists in the state
+            delete state[key];
+        } else {
+            // @ts-ignore - we are sure that the key exists in the state
+            deleteInPlace(state[key] as State, value);
+        }
+    }
+}
+
 // merge - takes an object and a diff to recreate the new object
+export function mergeDiffInPlace<T extends State>(state: T, diff: DiffResult<T>) {
+    // Merge the "modified" object into the state
+    Object.assign(state, diff.modified);
+    // Delete the "deleted" properties from the state
+    deleteInPlace(state, diff.deleted);
+}
+
+export function mergeDiff<T extends State>(state: T, diff: DiffResult<T>): State {
+    // Deep clone the state
+    const newState = cloneDeep(state);
+    // Merge the diff into the new state
+    mergeDiffInPlace(newState, diff);
+    return newState;
+}
