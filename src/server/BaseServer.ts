@@ -1,0 +1,1 @@
+// Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
