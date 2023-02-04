@@ -1,4 +1,4 @@
-import { DiffResults, RecursivePartial, diff } from "./client/Compare";
+import { DiffResult, RecursivePartial, diff } from "./client/Compare";
 
 const a = {
     test: "test",
@@ -8,7 +8,8 @@ const a = {
 }
 
 const b = {
-    test: "test"
+    test: "test b",
+    test2: {}
 }
 
 console.log(diff(a, b));
