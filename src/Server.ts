@@ -1,7 +1,6 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
 
-import { Server } from "socket.io";
-import { Socket } from "socket.io-client";
+import { Server, Socket } from "socket.io";
 import { BaseStateClient} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
@@ -12,18 +11,22 @@ import { JSONObject } from "./utils/State";
 
 export class StateServer extends BaseStateClient {
     private clientSockets: Map<string, Socket>;
-    private handlers: Map<string, (data: any) => void>;
+    private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
+    // private socketHandlers: Map<string, (data: any, sender: Socket) => void>;
     constructor(server: Server) {
         super();
-        this.socket = server;
-        this.clientSockets = new Map();
-        this.handlers = new Map();
+        this.socket = server; // The socket server
+        this.clientSockets = new Map(); // Map of client sockets
+        this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
+        // this.socketHandlers = new Map(); // Map of socket event handlers (per socket)
         this.socket.on("connection", (socket) => {
             console.log("Client connected: " + socket.id);
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
-            this.handlers.forEach((listener, event) => {
-                socket.on(event, listener);
+            this.channelHandlers.forEach((listener, event) => {
+                socket.on(event, (data: any) => {
+                    listener(data, socket);
+                });
             });
             socket.on("disconnect", () => {
                 console.log("Client disconnected: " + socket.id);
@@ -32,12 +35,13 @@ export class StateServer extends BaseStateClient {
         });
     }
     // General listener for event on all clients
-    protected socketOn(event: string, listener: (data: any) => void): void {
-        this.handlers.set(event, listener);
-        // Add handler to all existing clients if they don't already have it
+    protected socketOn(event: string, listener: (data: any, sender: Socket) => void): void {
+        this.channelHandlers.set(event, listener);
+        // Add handler to all existing clients
         this.clientSockets.forEach((socket) => {
-            socket.off(event, listener);
-            socket.on(event, listener);
+            socket.on(event, (data) => {
+                listener(data, socket);
+            });
         });
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
@@ -49,6 +53,9 @@ export class StateServer extends BaseStateClient {
     sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void {
         this.sendRawStateMessage(channel, diffResult as JSONObject);
     }
+    private relayStateMessage<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>, sender: Socket): void {
+        sender.broadcast.emit(this.getChannelName(channel), this.wrapStateMessage(diffResult as JSONObject));
+    }
     addStateChannel<T extends JSONObject>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
         super.addStateChannel(channel, 
             // Handle state changes
@@ -56,7 +63,12 @@ export class StateServer extends BaseStateClient {
             // Handle on receive state message
             (event) => {
                 // Forwards state message to all clients
-                this.sendDiffState(channel, event.diffResult);
+                // this.sendDiffState(channel, event.diffResult);
+                if (event.sender) {
+                    this.relayStateMessage(channel, event.diffResult, event.sender);
+                } else {
+                    throw new Error("No sender for state message?");
+                }
             },
             // Handle on receive request full state message
             (event) => {

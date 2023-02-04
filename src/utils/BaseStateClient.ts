@@ -3,6 +3,9 @@ import { Channel } from "./Channel";
 import { diff, DiffResult, mergeDiff, mergeDiffInPlace, RecursivePartial } from "./Compare";
 import { baseMetaMessageSchema, BaseMetaMessage, BaseRequestFullStateMessage, baseStateMessageSchema, baseRequestFullStateMessageSchema, BaseStateMessage, WithBaseMeta } from "../messages/BaseMessages";
 import { JSONObject } from "./State";
+import { Socket } from "socket.io";
+
+// Could do some refactoring so base state client does not need to know about socket.io
 
 const channelPrefix = "ch-";
 
@@ -14,10 +17,12 @@ type SocketClient = {
 type BaseMessageTypes = "requestFullState" | "state" | null;
 
 export type OnReceiveStateMessageArgs<T> = {
+    sender?: Socket;
     message: WithBaseMeta<BaseStateMessage>, valid: boolean, diffResult: DiffResult<T>, fullState: RecursivePartial<T>
 }
 
 export type OnReceiveRequestFullStateMessageArgs<T> = {
+    sender?: Socket;
     message: WithBaseMeta<BaseRequestFullStateMessage>, alreadyHasFullState: boolean
 }
 
@@ -32,7 +37,7 @@ export abstract class BaseStateClient {
         this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 	}
 
-    private wrapStateMessage<T extends JSONObject>(rawMessage: JSONObject): BaseMetaMessage {
+    protected wrapStateMessage<T extends JSONObject>(rawMessage: JSONObject): BaseMetaMessage {
         return {...rawMessage, timestamp: Date.now()};
     }
 
@@ -49,7 +54,7 @@ export abstract class BaseStateClient {
         return this.statesValid.get(this.getChannelName(channel)) ?? false;
     }
 
-    protected abstract socketOn(event: string, listener: (data: any) => void): void;
+    protected abstract socketOn(event: string, listener: (data: any, sender?: Socket) => void): void;
 
     abstract sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void;
     abstract sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void;
@@ -92,7 +97,7 @@ export abstract class BaseStateClient {
         this.channelMap.set(eventName, channel.schema);
         this.stateMap.set(eventName, {});
         // Add handler
-        this.socketOn(eventName, (message: BaseMetaMessage) => {
+        this.socketOn(eventName, (message: BaseMetaMessage, sender?: Socket) => {
             // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
             const validMessage = baseMetaMessageSchema.safeParse(message).success;
             if (!validMessage) {
@@ -110,7 +115,8 @@ export abstract class BaseStateClient {
                 }
                 onReceiveRequestFullStateMessage?.({
                     message: message as unknown as WithBaseMeta<BaseRequestFullStateMessage>,
-                    alreadyHasFullState: this.hasValidState(channel)
+                    alreadyHasFullState: this.hasValidState(channel),
+                    sender
                 });
                 return;
             } 
@@ -142,7 +148,8 @@ export abstract class BaseStateClient {
                     message: message as unknown as WithBaseMeta<BaseStateMessage>,
                     valid: valid,
                     diffResult: diffResult,
-                    fullState: currentState as RecursivePartial<T>
+                    fullState: currentState as RecursivePartial<T>,
+                    sender
                 });
                 return;
             }
