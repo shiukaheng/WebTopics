@@ -1,7 +1,7 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
 
 import { Server, Socket } from "socket.io";
-import { BaseStateClient} from "./utils/BaseStateClient";
+import { BaseStateClient, channelPrefix} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject } from "./utils/State";
@@ -23,10 +23,13 @@ export class StateServer extends BaseStateClient {
             console.log("Client connected: " + socket.id);
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
-            this.channelHandlers.forEach((listener, event) => {
-                socket.on(event, (data: any) => {
-                    listener(data, socket);
-                });
+            socket.onAny((event: string, data: any) => {
+                if (event.startsWith(channelPrefix)) {
+                    const handler = this.channelHandlers.get(event);
+                    if (handler) {
+                        handler(data, socket);
+                    }
+                }
             });
             socket.on("disconnect", () => {
                 console.log("Client disconnected: " + socket.id);
@@ -35,14 +38,8 @@ export class StateServer extends BaseStateClient {
         });
     }
     // General listener for event on all clients
-    protected socketOn(event: string, listener: (data: any, sender: Socket) => void): void {
+    protected setSocketHandler(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
-        // Add handler to all existing clients
-        this.clientSockets.forEach((socket) => {
-            socket.on(event, (data) => {
-                listener(data, socket);
-            });
-        });
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
     sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void {

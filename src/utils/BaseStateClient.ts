@@ -7,7 +7,7 @@ import { Socket } from "socket.io";
 
 // Could do some refactoring so base state client does not need to know about socket.io
 
-const channelPrefix = "ch-";
+export const channelPrefix = "ch-";
 
 type SocketClient = {
     emit: (event: string, ...args: any[]) => void;
@@ -54,7 +54,7 @@ export abstract class BaseStateClient {
         return this.statesValid.get(this.getChannelName(channel)) ?? false;
     }
 
-    protected abstract socketOn(event: string, listener: (data: any, sender?: Socket) => void): void;
+    protected abstract setSocketHandler(event: string, listener: (data: any, sender?: Socket) => void): void;
 
     abstract sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void;
     abstract sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void;
@@ -97,7 +97,7 @@ export abstract class BaseStateClient {
         this.channelMap.set(eventName, channel.schema);
         this.stateMap.set(eventName, {});
         // Add handler
-        this.socketOn(eventName, (message: BaseMetaMessage, sender?: Socket) => {
+        this.setSocketHandler(eventName, (message: BaseMetaMessage, sender?: Socket) => {
             // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
             const validMessage = baseMetaMessageSchema.safeParse(message).success;
             if (!validMessage) {
