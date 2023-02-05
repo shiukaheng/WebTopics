@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JSONValue } from "./State";
+import { JSONValue } from "./JSON";
 
 export type Channel<T extends JSONValue> = {
     name: string;

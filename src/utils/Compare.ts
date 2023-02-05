@@ -1,5 +1,5 @@
 import { cloneDeep, isEqual } from 'lodash';
-import { JSONObject, JSONValue } from './State';
+import { JSONObject, JSONValue } from './JSON';
 
 // TODO: Fix types!!!
 

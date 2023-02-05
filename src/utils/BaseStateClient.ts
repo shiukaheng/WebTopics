@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Channel } from "./Channel";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
 import { metaMessageSchema, MessageMeta, requestFullStateMessage, stateMessageSchema, requestFullStateMessageSchema, StateMessage, WithMeta, MessageType } from "../messages/Messages";
-import { JSONObject, JSONValue } from "./State";
+import { JSONObject, JSONValue } from "./JSON";
 import { Socket } from "socket.io";
 
 // TODO: Can add deletion! We need to intelligently merge the state on the server to make sure there are no delete conflicts

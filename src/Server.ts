@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import { BaseStateClient, channelPrefix} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
-import { JSONObject, JSONValue } from "./utils/State";
+import { JSONObject, JSONValue } from "./utils/JSON";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
