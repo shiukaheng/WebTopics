@@ -19,19 +19,19 @@ const testChannel = {
 const socketIOServer = new Server(3000);
 const stateServer = new StateServer(socketIOServer);
 
-stateServer.addStateChannel(testChannel, (state) => {
+stateServer.sub(testChannel, (state) => {
     console.log(`Server received state: ${JSON.stringify(state)}`)
 });
 
 // Client 1
 const stateClient1 = new StateClient("http://localhost:3000");
-stateClient1.addStateChannel(testChannel, (state) => {
+stateClient1.sub(testChannel, (state) => {
     console.log(`Client 1 received state: ${JSON.stringify(state)}`)
 });
 
 // Send updates regularly from client 1
 setInterval(() => {
-    stateClient1.updateState(testChannel, {
+    stateClient1.pub(testChannel, {
         a: "test",
         b: Math.random()
     });

@@ -13,7 +13,7 @@ export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
     private socket: Server;
-    constructor(server: Server, channels: Channel<any>[] = []) {
+    constructor(server: Server) {
         super();
         this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
@@ -34,16 +34,12 @@ export class StateServer extends BaseStateClient<Socket> {
                 this.clientSockets.delete(socket.id);
             });
         });
-        // Add channels
-        channels.forEach((channel) => {
-            this.addStateChannel(channel);
-        });
     }
     // General listener for event on all clients
-    protected onEvent(event: string, listener: (data: any, sender: Socket) => void): void {
+    protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
     }
-    protected emitEvent(event: string, data: any): void {
+    protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
     sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
@@ -52,8 +48,8 @@ export class StateServer extends BaseStateClient<Socket> {
     private relayStateMessage<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, sender: Socket): void {
         sender.broadcast.emit(this.getChannelName(channel), this.wrapMessage(diffResult as JSONObject, "state"));
     }
-    addStateChannel<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.addStateChannel(channel, 
+    sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+        super.sub(channel, 
             // Handle state changes
             handler, 
             // Handle on receive state message
