@@ -47,6 +47,3 @@ stateClient.sub(sensorChannel, (value) => {
   console.log(value)
 })
 ```
-# Features
-- Multiple clients can publish and subscribe to the same state
-- Only delta updates are sent over the wire
