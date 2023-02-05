@@ -2,9 +2,6 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import { StateServer } from "./Server";
 import { StateClient } from "./Client";
-import { io } from "socket.io-client";
-
-import { diff } from "./utils/Compare"
 
 const testSchema = z.object({
     a: z.string(),

@@ -4,7 +4,7 @@ import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
 import { metaMessageSchema, MessageMeta, requestFullStateMessage, stateMessageSchema, requestFullStateMessageSchema, StateMessage, WithMeta, MessageType } from "../messages/Messages";
 import { JSONObject, JSONValue } from "./JSON";
 
-// TODO: Can add deletion! We need to intelligently merge the state on the server to make sure there are no delete conflicts
+// TODO: Can add deletion feature. We need to intelligently merge the state on the server to make sure there are no delete conflicts
 // Then, we can send the diff to all the clients
 // We need a seperate message type called "set" though, and this will remove all hope of decentralization unfortunately
 // But it will be hard to decentralize if we need to do it through the internet anyway so it's not that bad!
@@ -27,7 +27,12 @@ export abstract class BaseStateClient<V = void> {
     protected channelHandlersMap: Map<string, ((state: JSONValue) => void)[]> = new Map();
     protected stateMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected statesValid: Map<string, boolean> = new Map();
-    protected id: string;
+    // protected id: string; // Unused for now
+
+    /**
+     * Whether the client subscribes get called from its own publishes
+     */
+    selfSubscribed: boolean;
 
     // Abstract methods
     protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
@@ -35,8 +40,9 @@ export abstract class BaseStateClient<V = void> {
     abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
 
     // Default constructor
-	constructor() {
-        this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+	constructor(selfSubscribed: boolean = true) {
+        this.selfSubscribed = selfSubscribed;
+        // this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 	}
 
     // Helper / convenience methods
@@ -183,6 +189,9 @@ export abstract class BaseStateClient<V = void> {
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
             this.stateMap.set(channelPrefix+channel.name, state);
             this.sendDiffState(channel, diffResult);
+            if (this.selfSubscribed) {
+                this.channelHandlersMap.get(channelPrefix+channel.name)?.forEach(handler => handler(state));
+            }
         }
     }
 

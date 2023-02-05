@@ -10,8 +10,8 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // Make server mirror client messages so they get broadcasted to all clients
 
 export class StateClient extends BaseStateClient {
-    constructor(serverURL: string) {
-        super();
+    constructor(serverURL: string, selfSubscribed: boolean = true) {
+        super(selfSubscribed);
         this.socket = io(serverURL);
     }
     protected onRawEvent(event: string, listener: (data: any) => void): void {

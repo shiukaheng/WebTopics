@@ -13,8 +13,8 @@ export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
     private socket: Server;
-    constructor(server: Server) {
-        super();
+    constructor(server: Server, selfSubscribed: boolean = true) {
+        super(selfSubscribed);
         this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
