@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { BaseStateClient} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
-import { JSONObject } from "./utils/State";
+import { JSONObject, JSONValue } from "./utils/State";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
@@ -18,15 +18,10 @@ export class StateClient extends BaseStateClient {
         this.socket = io(serverURL);
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
-    sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void {
-        this.sendRawStateMessage(channel, {
-            requestFullState: true
-        });
+    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
+        this.sendStateMessage(channel, diffResult as JSONObject);
     }
-    sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void {
-        this.sendRawStateMessage(channel, diffResult as JSONObject);
-    }
-    addStateChannel<T extends JSONObject>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+    addStateChannel<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
         super.addStateChannel(channel, 
             // Handle state changes
             handler

@@ -1,4 +1,4 @@
-import { cloneDeep, isEqual, merge } from 'lodash';
+import { cloneDeep, isEqual } from 'lodash';
 import { JSONObject, JSONValue } from './State';
 
 // TODO: Fix types!!!
@@ -121,16 +121,15 @@ export function diff<T extends JSONValue, U extends JSONValue>(oldValue: T, newV
     return { modified, deleted };
 }
 
-export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T, diff: DiffResult<T, U>): any {
-    // Merge the "modified" object into the state
-    const modified = merge(oldValue, diff.modified);
-    // Delete the "deleted" properties from the state
-    const deleted = recursiveDelete(modified, diff.deleted);
+// A valid Diff should not have a property in both modified and deleted, but our function will be lenient and allow it by applying deleted first, then modified
+export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T | undefined, diff: DiffResult<T, U>): any {
+    const deleted = recursiveDelete(oldValue, diff.deleted);
+    const modified = recursiveMerge(deleted as JSONValue | undefined, diff.modified);
+    return modified;
 }
 
-function recursiveDelete<T extends JSONValue>(oldValue: T, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T> {
+function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T | undefined> {
     // Get the type of the old value
-    // const oldValueType = valueType(oldValue);
     const deleteObjectType = valueType(deleteObject);
     if (deleteObjectType === "undefined") {
         // If deleteObject is undefined, return the old value
@@ -148,32 +147,27 @@ function recursiveDelete<T extends JSONValue>(oldValue: T, deleteObject: Recursi
     }
 }
 
-// // Recursively delete in state using delete object
-// function deleteInPlace<T extends JSONObject>(state: T, deleteObject: RecursivePartial<RecursiveNull<T>>) {
-//     for (const key of Object.keys(deleteObject)) {
-//         const value = deleteObject[key];
-//         if (value === null) {
-//             // @ts-ignore - we are sure that the key exists in the state
-//             delete state[key];
-//         } else {
-//             // @ts-ignore - we are sure that the key exists in the state
-//             deleteInPlace(state[key] as JSONObject, value);
-//         }
-//     }
-// }
-
-// // merge - takes an object and a diff to recreate the new object
-// export function mergeDiffInPlace<T extends JSONObject>(state: T, diff: DiffResult<T>) {
-//     // Merge the "modified" object into the state
-//     Object.assign(state, diff.modified);
-//     // Delete the "deleted" properties from the state
-//     deleteInPlace(state, diff.deleted);
-// }
-
-// export function mergeDiff<T extends JSONObject>(state: T, diff: DiffResult<T>): JSONObject {
-//     // Deep clone the state
-//     const newState = cloneDeep(state);
-//     // Merge the diff into the new state
-//     mergeDiffInPlace(newState, diff);
-//     return newState;
-// }
+function recursiveMerge<T extends JSONValue, U extends JSONValue>(oldValue: T | undefined, mergeObject: RecursivePartial<T & U>): RecursivePartial<T & U> {
+    // Get the type of the old value
+    const oldValueType = valueType(oldValue);
+    const mergeObjectType = valueType(mergeObject);
+    // 9 possible cases
+    // Types are different (6 cases)
+    if (oldValueType !== mergeObjectType) {
+        return mergeObject as RecursivePartial<T & U>;
+    } else {
+        // Types are the same (3 cases)
+        if (oldValueType === "undefined" || oldValueType === "primitive") {
+            return mergeObject as RecursivePartial<T & U>;
+        } else {
+            // Else, both are objects, so we need to recurse
+            // Deep copy the old value
+            const result: RecursivePartial<T & U> = cloneDeep(oldValue) as RecursivePartial<T & U>;
+            // Merge the mergeObject into the result
+            for (const key of Object.keys(mergeObject as object)) {
+                (result as any)[key] = recursiveMerge((oldValue as any)[key], (mergeObject as any)[key]);
+            }
+            return result;
+        }
+    }
+}

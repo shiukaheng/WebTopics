@@ -37,7 +37,6 @@ export abstract class BaseStateClient {
 
     // Abstract methods
     protected abstract setSocketHandler(event: string, listener: (data: any, sender?: Socket) => void): void;
-    abstract sendRequestFullState<T extends JSONValue>(channel: Channel<T>): void;
     abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
 
     // Default constructor
@@ -55,12 +54,12 @@ export abstract class BaseStateClient {
     }
 
     // Messages
-    protected wrapStateMessage(rawMessage: JSONObject, messageType: MessageType): MessageMeta {
+    protected wrapMessage(rawMessage: JSONObject, messageType: MessageType): MessageMeta {
         return {...rawMessage, timestamp: Date.now(), messageType};
     }
 
-    protected sendRawStateMessage<T extends JSONValue>(channel: Channel<T>, message: DiffResult<T, T>) {
-        this.socket.emit(this.getChannelName(channel), this.wrapStateMessage(message as JSONObject, "state"));
+    protected sendStateMessage<T extends JSONValue>(channel: Channel<T>, diff: DiffResult<T, T>) {
+        this.socket.emit(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state"));
     }
 
     sendFullState<T extends JSONValue>(channel: Channel<T>): void {
@@ -77,14 +76,20 @@ export abstract class BaseStateClient {
         }
     }
 
+    sendRequestFullState<T extends JSONValue>(channel: Channel<T>): void {
+        this.socket.emit(this.getChannelName(channel), this.wrapMessage({}, "requestFullState"));
+    }
+
     addStateChannel<T extends JSONValue>(channel: Channel<T>, onStateChange?: (state: T) => void, 
         onReceiveStateMessage?: (args: OnReceiveStateMessageArgs<T>) => void,
         onReceiveRequestFullStateMessage?: (args: OnReceiveRequestFullStateMessageArgs<T>) => void
         ): void {
         // Initialize channel
         const eventName = this.getChannelName(channel);
+        // console.log("Adding channel: ", eventName);
         this.channelMap.set(eventName, channel.schema);
         this.stateMap.set(eventName, {});
+        // console.log(this.stateMap);
         // Add handler
         this.setSocketHandler(eventName, (message: MessageMeta, sender?: Socket) => {
             // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
@@ -113,15 +118,16 @@ export abstract class BaseStateClient {
             if (message.messageType === "state") {
                 // See if we have the state initialized. It should, because we need to initalize it before we can receive updates.
                 const currentState = this.stateMap.get(eventName);
-                if (currentState === undefined) {
-                    throw new Error("Channel not found. This should not happen.");
-                }
+                // console.log(eventName, currentState);
+                if (this.stateMap.has(eventName) === false) {
+                    throw new Error(`State for channel ${channel.name} not initialized`);
+                };
                 // Cast the message to the correct type
                 const diffResult = message as unknown as DiffResult<T, T>;
                 // Update the state
                 const newState = mergeDiff(currentState, diffResult);
                 // See if the new state is valid according to the state schema
-                const valid = channel.schema.safeParse(currentState).success;
+                const valid = channel.schema.safeParse(newState).success;
                 // Update the state validity and value, and call the handler if it is valid and if there are any changes
                 if (valid) {
                     this.statesValid.set(eventName, true);
@@ -156,7 +162,9 @@ export abstract class BaseStateClient {
         }
         const diffResult = diff(currentState as T, state);
         // Disallow deletions of state properties
-        diffResult.deleted = undefined;
+        if (!allowDeletions) {
+            diffResult.deleted = undefined;
+        }
         // Only emit if there are changes
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
             this.stateMap.set(channelPrefix+channel.name, state);

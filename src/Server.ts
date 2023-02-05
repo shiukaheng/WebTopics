@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import { BaseStateClient, channelPrefix} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
-import { JSONObject } from "./utils/State";
+import { JSONObject, JSONValue } from "./utils/State";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
@@ -20,7 +20,6 @@ export class StateServer extends BaseStateClient {
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
         // this.socketHandlers = new Map(); // Map of socket event handlers (per socket)
         this.socket.on("connection", (socket) => {
-            console.log("Client connected: " + socket.id);
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
             socket.onAny((event: string, data: any) => {
@@ -42,18 +41,13 @@ export class StateServer extends BaseStateClient {
         this.channelHandlers.set(event, listener);
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
-    sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void {
-        this.sendRawStateMessage(channel, {
-            requestFullState: true
-        });
+    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
+        this.sendStateMessage(channel, diffResult as JSONObject);
     }
-    sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void {
-        this.sendRawStateMessage(channel, diffResult as JSONObject);
+    private relayStateMessage<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, sender: Socket): void {
+        sender.broadcast.emit(this.getChannelName(channel), this.wrapMessage(diffResult as JSONObject, "state"));
     }
-    private relayStateMessage<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>, sender: Socket): void {
-        sender.broadcast.emit(this.getChannelName(channel), this.wrapStateMessage(diffResult as JSONObject));
-    }
-    addStateChannel<T extends JSONObject>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+    addStateChannel<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
         super.addStateChannel(channel, 
             // Handle state changes
             handler, 
