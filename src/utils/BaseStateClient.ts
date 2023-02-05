@@ -5,6 +5,8 @@ import { metaMessageSchema, MessageMeta, requestFullStateMessage, stateMessageSc
 import { JSONObject, JSONValue } from "./JSON";
 import { Socket } from "socket.io";
 
+// TODO: Decouple from socket.io and create on(event, handler) and emit(event, data) abstract methods
+
 // TODO: Can add deletion! We need to intelligently merge the state on the server to make sure there are no delete conflicts
 // Then, we can send the diff to all the clients
 // We need a seperate message type called "set" though, and this will remove all hope of decentralization unfortunately
@@ -15,7 +17,6 @@ export const channelPrefix = "ch-";
 
 type SocketClient = {
     emit: (event: string, ...args: any[]) => void;
-    on: (event: string, listener: (...args: any[]) => void) => void;
 }
 
 export type OnReceiveStateMessageArgs<T extends JSONValue> = {
@@ -28,7 +29,7 @@ export type OnReceiveRequestFullStateMessageArgs<T> = {
     message: WithMeta<requestFullStateMessage>, alreadyHasFullState: boolean
 }
 
-export abstract class BaseStateClient {
+export abstract class BaseStateClient<V extends JSONValue> {
     protected abstract socket: SocketClient;
     protected channelMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
     protected stateMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
@@ -36,7 +37,8 @@ export abstract class BaseStateClient {
     protected id: string;
 
     // Abstract methods
-    protected abstract setSocketHandler(event: string, listener: (data: any, sender?: Socket) => void): void;
+    protected abstract onEvent(event: string, listener: (data: any, sender?: Socket) => void): void;
+    // protected abstract emitEvent(event: string, data: any): void;
     abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
 
     // Default constructor
@@ -91,7 +93,7 @@ export abstract class BaseStateClient {
         this.stateMap.set(eventName, {});
         // console.log(this.stateMap);
         // Add handler
-        this.setSocketHandler(eventName, (message: MessageMeta, sender?: Socket) => {
+        this.onEvent(eventName, (message: MessageMeta, sender?: Socket) => {
             // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
             const validMessage = metaMessageSchema.safeParse(message).success;
             if (!validMessage) {

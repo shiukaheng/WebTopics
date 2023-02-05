@@ -37,7 +37,7 @@ export class StateServer extends BaseStateClient {
         });
     }
     // General listener for event on all clients
-    protected setSocketHandler(event: string, listener: (data: any, sender: Socket) => void): void {
+    protected onEvent(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
