@@ -10,12 +10,19 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // Make server mirror client messages so they get broadcasted to all clients
 
 export class StateClient extends BaseStateClient {
+    constructor(serverURL: string, channels: Channel<any>[] = []) {
+        super();
+        this.socket = io(serverURL);
+        // Add channels
+        channels.forEach((channel) => {
+            this.addStateChannel(channel);
+        });
+    }
     protected onEvent(event: string, listener: (data: any) => void): void {
         this.socket.on(event, listener);
     }
-    constructor(serverURL: string) {
-        super();
-        this.socket = io(serverURL);
+    protected emitEvent(event: string, data: any): void {
+        this.socket.emit(event, data);
     }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
     sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {

@@ -9,16 +9,15 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
 
-export class StateServer extends BaseStateClient {
+export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
-    // private socketHandlers: Map<string, (data: any, sender: Socket) => void>;
-    constructor(server: Server) {
+    private socket: Server;
+    constructor(server: Server, channels: Channel<any>[] = []) {
         super();
-        this.socket = server; // The socket server
+        this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
-        // this.socketHandlers = new Map(); // Map of socket event handlers (per socket)
         this.socket.on("connection", (socket) => {
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
@@ -35,12 +34,18 @@ export class StateServer extends BaseStateClient {
                 this.clientSockets.delete(socket.id);
             });
         });
+        // Add channels
+        channels.forEach((channel) => {
+            this.addStateChannel(channel);
+        });
     }
     // General listener for event on all clients
     protected onEvent(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
     }
-    protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
+    protected emitEvent(event: string, data: any): void {
+        this.socket.emit(event, data);
+    }
     sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
         this.sendStateMessage(channel, diffResult as JSONObject);
     }
@@ -53,8 +58,7 @@ export class StateServer extends BaseStateClient {
             handler, 
             // Handle on receive state message
             (event) => {
-                // Forwards state message to all clients
-                // this.sendDiffState(channel, event.diffResult);
+                // Forwards state message to all clients except sender
                 if (event.sender) {
                     this.relayStateMessage(channel, event.diffResult, event.sender);
                 } else {

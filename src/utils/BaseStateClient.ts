@@ -3,9 +3,6 @@ import { Channel } from "./Channel";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
 import { metaMessageSchema, MessageMeta, requestFullStateMessage, stateMessageSchema, requestFullStateMessageSchema, StateMessage, WithMeta, MessageType } from "../messages/Messages";
 import { JSONObject, JSONValue } from "./JSON";
-import { Socket } from "socket.io";
-
-// TODO: Decouple from socket.io and create on(event, handler) and emit(event, data) abstract methods
 
 // TODO: Can add deletion! We need to intelligently merge the state on the server to make sure there are no delete conflicts
 // Then, we can send the diff to all the clients
@@ -15,30 +12,25 @@ import { Socket } from "socket.io";
 
 export const channelPrefix = "ch-";
 
-type SocketClient = {
-    emit: (event: string, ...args: any[]) => void;
-}
-
-export type OnReceiveStateMessageArgs<T extends JSONValue> = {
-    sender?: Socket;
+export type OnReceiveStateMessageArgs<T extends JSONValue, V = void> = {
+    sender?: V;
     message: WithMeta<StateMessage>, valid: boolean, diffResult: DiffResult<T, T>, fullState: RecursivePartial<T>
 }
 
-export type OnReceiveRequestFullStateMessageArgs<T> = {
-    sender?: Socket;
+export type OnReceiveRequestFullStateMessageArgs<V = void> = {
+    sender?: V;
     message: WithMeta<requestFullStateMessage>, alreadyHasFullState: boolean
 }
 
-export abstract class BaseStateClient<V extends JSONValue> {
-    protected abstract socket: SocketClient;
+export abstract class BaseStateClient<V = void> {
     protected channelMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
     protected stateMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected statesValid: Map<string, boolean> = new Map();
     protected id: string;
 
     // Abstract methods
-    protected abstract onEvent(event: string, listener: (data: any, sender?: Socket) => void): void;
-    // protected abstract emitEvent(event: string, data: any): void;
+    protected abstract onEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
+    protected abstract emitEvent(event: string, data: any): void;
     abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
 
     // Default constructor
@@ -61,7 +53,7 @@ export abstract class BaseStateClient<V extends JSONValue> {
     }
 
     protected sendStateMessage<T extends JSONValue>(channel: Channel<T>, diff: DiffResult<T, T>) {
-        this.socket.emit(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state"));
+        this.emitEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state"));
     }
 
     sendFullState<T extends JSONValue>(channel: Channel<T>): void {
@@ -79,12 +71,12 @@ export abstract class BaseStateClient<V extends JSONValue> {
     }
 
     sendRequestFullState<T extends JSONValue>(channel: Channel<T>): void {
-        this.socket.emit(this.getChannelName(channel), this.wrapMessage({}, "requestFullState"));
+        this.emitEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState"));
     }
 
     addStateChannel<T extends JSONValue>(channel: Channel<T>, onStateChange?: (state: T) => void, 
-        onReceiveStateMessage?: (args: OnReceiveStateMessageArgs<T>) => void,
-        onReceiveRequestFullStateMessage?: (args: OnReceiveRequestFullStateMessageArgs<T>) => void
+        onReceiveStateMessage?: (args: OnReceiveStateMessageArgs<T, V>) => void,
+        onReceiveRequestFullStateMessage?: (args: OnReceiveRequestFullStateMessageArgs<V>) => void
         ): void {
         // Initialize channel
         const eventName = this.getChannelName(channel);
@@ -93,7 +85,7 @@ export abstract class BaseStateClient<V extends JSONValue> {
         this.stateMap.set(eventName, {});
         // console.log(this.stateMap);
         // Add handler
-        this.onEvent(eventName, (message: MessageMeta, sender?: Socket) => {
+        this.onEvent(eventName, (message: MessageMeta, sender: V) => {
             // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
             const validMessage = metaMessageSchema.safeParse(message).success;
             if (!validMessage) {
@@ -111,7 +103,7 @@ export abstract class BaseStateClient<V extends JSONValue> {
                 onReceiveRequestFullStateMessage?.({
                     message: message as unknown as WithMeta<requestFullStateMessage>,
                     alreadyHasFullState: this.hasValidState(channel),
-                    sender
+                    sender: sender
                 });
                 return;
             } 
