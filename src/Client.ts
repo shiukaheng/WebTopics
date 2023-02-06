@@ -4,30 +4,28 @@ import { io } from "socket.io-client";
 import { BaseStateClient} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
-import { JSONObject } from "./utils/State";
+import { JSONObject, JSONValue } from "./utils/JSON";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
 
 export class StateClient extends BaseStateClient {
-    protected socketOn(event: string, listener: (data: any) => void): void {
-        this.socket.on(event, listener);
-    }
-    constructor(serverURL: string) {
-        super();
+    constructor(serverURL: string, selfSubscribed: boolean = true) {
+        super(selfSubscribed);
         this.socket = io(serverURL);
     }
+    protected onRawEvent(event: string, listener: (data: any) => void): void {
+        this.socket.on(event, listener);
+    }
+    protected emitRawEvent(event: string, data: any): void {
+        this.socket.emit(event, data);
+    }
     protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
-    sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void {
-        this.sendRawStateMessage(channel, {
-            requestFullState: true
-        });
+    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
+        this.sendStateMessage(channel, diffResult as JSONObject);
     }
-    sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void {
-        this.sendRawStateMessage(channel, diffResult as JSONObject);
-    }
-    addStateChannel<T extends JSONObject>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.addStateChannel(channel, 
+    sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+        super.sub(channel, 
             // Handle state changes
             handler
         );

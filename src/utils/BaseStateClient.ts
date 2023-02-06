@@ -1,188 +1,205 @@
 import { z } from "zod";
 import { Channel } from "./Channel";
-import { diff, DiffResult, mergeDiff, mergeDiffInPlace, RecursivePartial } from "./Compare";
-import { baseMetaMessageSchema, BaseMetaMessage, BaseRequestFullStateMessage, baseStateMessageSchema, baseRequestFullStateMessageSchema, BaseStateMessage, WithBaseMeta } from "../messages/BaseMessages";
-import { JSONObject } from "./State";
-import { Socket } from "socket.io";
+import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
+import { metaMessageSchema, MessageMeta, requestFullStateMessage, stateMessageSchema, requestFullStateMessageSchema, StateMessage, WithMeta, MessageType } from "../messages/Messages";
+import { JSONObject, JSONValue } from "./JSON";
 
-// Could do some refactoring so base state client does not need to know about socket.io
+// TODO: Can add deletion feature. We need to intelligently merge the state on the server to make sure there are no delete conflicts
+// Then, we can send the diff to all the clients
+// We need a seperate message type called "set" though, and this will remove all hope of decentralization unfortunately
+// But it will be hard to decentralize if we need to do it through the internet anyway so it's not that bad!
+// Just changes the application of the library
 
-const channelPrefix = "ch-";
+export const channelPrefix = "ch-";
 
-type SocketClient = {
-    emit: (event: string, ...args: any[]) => void;
-    on: (event: string, listener: (...args: any[]) => void) => void;
+export type OnReceiveStateMessageArgs<T extends JSONValue, V = void> = {
+    sender?: V;
+    message: WithMeta<StateMessage>, valid: boolean, diffResult: DiffResult<T, T>, fullState: RecursivePartial<T>
 }
 
-type BaseMessageTypes = "requestFullState" | "state" | null;
-
-export type OnReceiveStateMessageArgs<T> = {
-    sender?: Socket;
-    message: WithBaseMeta<BaseStateMessage>, valid: boolean, diffResult: DiffResult<T>, fullState: RecursivePartial<T>
+export type OnReceiveRequestFullStateMessageArgs<V = void> = {
+    sender?: V;
+    message: WithMeta<requestFullStateMessage>, alreadyHasFullState: boolean
 }
 
-export type OnReceiveRequestFullStateMessageArgs<T> = {
-    sender?: Socket;
-    message: WithBaseMeta<BaseRequestFullStateMessage>, alreadyHasFullState: boolean
-}
-
-export abstract class BaseStateClient {
-    protected abstract socket: SocketClient;
-    protected channelMap: Map<string, z.ZodSchema<JSONObject>> = new Map();
-    protected stateMap: Map<string, JSONObject> = new Map(); // Not guaranteed to be complete, need validation on each update
+export abstract class BaseStateClient<V = void> {
+    protected channelMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
+    protected channelHandlersMap: Map<string, ((state: JSONValue) => void)[]> = new Map();
+    protected stateMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected statesValid: Map<string, boolean> = new Map();
-    protected id: string;
+    // protected id: string; // Unused for now
 
-	constructor() {
-        this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    /**
+     * Whether the client subscribes get called from its own publishes
+     */
+    selfSubscribed: boolean;
+
+    // Abstract methods
+    protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
+    protected abstract emitRawEvent(event: string, data: any): void;
+    abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
+
+    // Default constructor
+	constructor(selfSubscribed: boolean = true) {
+        this.selfSubscribed = selfSubscribed;
+        // this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 	}
 
-    protected wrapStateMessage<T extends JSONObject>(rawMessage: JSONObject): BaseMetaMessage {
-        return {...rawMessage, timestamp: Date.now()};
-    }
-
-    protected sendRawStateMessage<T extends JSONObject>(channel: Channel<T>, message: JSONObject) {
-        this.socket.emit(this.getChannelName(channel), this.wrapStateMessage(message));
-        console.log(`Sent state message to channel ${channel.name}: ${JSON.stringify(message)} from client ${this.id}`);
-    }
-
-    protected getChannelName<T extends JSONObject>(channel: Channel<T>): string {
+    // Helper / convenience methods
+    protected getChannelName<T extends JSONValue>(channel: Channel<T>): string {
         return channelPrefix+channel.name;
     }
-    
-    hasValidState<T extends JSONObject>(channel: Channel<T>): boolean {
+
+    hasValidState<T extends JSONValue>(channel: Channel<T>): boolean {
         return this.statesValid.get(this.getChannelName(channel)) ?? false;
     }
 
-    protected abstract socketOn(event: string, listener: (data: any, sender?: Socket) => void): void;
+    // Messages
+    protected wrapMessage(rawMessage: JSONObject, messageType: MessageType): MessageMeta {
+        return {...rawMessage, timestamp: Date.now(), messageType};
+    }
 
-    abstract sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void;
-    abstract sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void;
+    protected sendStateMessage<T extends JSONValue>(channel: Channel<T>, diff: DiffResult<T, T>) {
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state"));
+    }
 
-    sendFullState<T extends JSONObject>(channel: Channel<T>): void {
+    sendFullState<T extends JSONValue>(channel: Channel<T>): void {
         // Try to get full state from channel
-        const fullState = this.getState(channel);
+        const fullState = this.get(channel);
         if (fullState === undefined) {
             console.warn(`Cannot send full state for channel ${channel.name} - no full state available`);
             return;
         } else {
             this.sendDiffState(channel, {
                 // @ts-ignore - this is a valid state, but the type system doesn't know that
-                modified: fullState,
-                // @ts-ignore - same as above
-                deleted: {}
+                modified: fullState
             });
         }
     }
 
-    protected getMessageType(message: BaseMetaMessage): BaseMessageTypes {
-        if (!baseMetaMessageSchema.safeParse(message).success) {
-            return null;
-        }
-        // Use the schema to determine the message type
-        if (baseStateMessageSchema.safeParse(message).success) {
-            return "state";
-        } else if (baseRequestFullStateMessageSchema.safeParse(message).success) {
-            return "requestFullState";
-        }
-        return null;
+    sendRequestFullState<T extends JSONValue>(channel: Channel<T>): void {
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState"));
     }
 
-    addStateChannel<T extends JSONObject>(channel: Channel<T>, onStateChange?: (state: T) => void, 
-        onReceiveStateMessage?: (args: OnReceiveStateMessageArgs<T>) => void,
-        onReceiveRequestFullStateMessage?: (args: OnReceiveRequestFullStateMessageArgs<T>) => void
+    sub<T extends JSONValue>(channel: Channel<T>, onStateChange?: (state: T) => void, 
+        onReceiveStateMessage?: (args: OnReceiveStateMessageArgs<T, V>) => void,
+        onReceiveRequestFullStateMessage?: (args: OnReceiveRequestFullStateMessageArgs<V>) => void
         ): void {
         // Initialize channel
         const eventName = this.getChannelName(channel);
-        this.channelMap.set(eventName, channel.schema);
-        this.stateMap.set(eventName, {});
-        // Add handler
-        this.socketOn(eventName, (message: BaseMetaMessage, sender?: Socket) => {
-            // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
-            const validMessage = baseMetaMessageSchema.safeParse(message).success;
-            if (!validMessage) {
-                console.warn("Invalid message received: ", message);
-                return;
+        if (!this.channelMap.has(eventName)) {
+            this.channelMap.set(eventName, channel.schema);
+            this.stateMap.set(eventName, {});
+            if (this.channelHandlersMap.has(eventName) === false) {
+                this.channelHandlersMap.set(eventName, []);
             }
-            const messageType = this.getMessageType(message);
-
-            // Handle request for full state
-            if (messageType === "requestFullState") {
-                if (this.hasValidState(channel)) {
-                    this.sendFullState(channel);
-                } else {
-                    console.warn(`Invalid state for channel ${channel.name} - cannot send full state`);
+            // Add raw event listener
+            this.onRawEvent(eventName, (message: MessageMeta, sender: V) => {
+                // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the state is valid
+                const validMessage = metaMessageSchema.safeParse(message).success;
+                if (!validMessage) {
+                    console.warn("Invalid message received: ", message);
+                    return;
                 }
-                onReceiveRequestFullStateMessage?.({
-                    message: message as unknown as WithBaseMeta<BaseRequestFullStateMessage>,
-                    alreadyHasFullState: this.hasValidState(channel),
-                    sender
-                });
-                return;
-            } 
-            
-            // Handle state update
-            if (messageType === "state") {
-                // See if we have the state initialized. It should, because we need to initalize it before we can receive updates.
-                const currentState = this.stateMap.get(eventName);
-                if (currentState === undefined) {
-                    throw new Error("Channel not found. This should not happen.");
-                }
-                // Cast the message to the correct type
-                const diffResult = message as unknown as DiffResult<T>;
-                // Update the state
-                mergeDiffInPlace((currentState as JSONObject), diffResult);
-                // See if the new state is valid according to the state schema
-                const valid = channel.schema.safeParse(currentState).success;
-                // Update the state validity and value, and call the handler if it is valid and if there are any changes
-                if (valid) {
-                    this.statesValid.set(eventName, true);
-                    // Call the handler if there are any changes
-                    if (Object.keys(diffResult.modified).length > 0 || Object.keys(diffResult.deleted).length > 0) {
-                        onStateChange?.(currentState as T);
+                metaMessageSchema.parse(message);
+                // Handle request for full state
+                if (message.messageType === "requestFullState") {
+                    if (this.hasValidState(channel)) {
+                        this.sendFullState(channel);
+                    } else {
+                        console.warn(`Invalid state for channel ${channel.name} - cannot send full state`);
                     }
-                } else {
-                    this.statesValid.set(eventName, false);
+                    onReceiveRequestFullStateMessage?.({
+                        message: message as unknown as WithMeta<requestFullStateMessage>,
+                        alreadyHasFullState: this.hasValidState(channel),
+                        sender: sender
+                    });
+                    return;
+                } 
+                
+                // Handle state update
+                if (message.messageType === "state") {
+                    // See if we have the state initialized. It should, because we need to initalize it before we can receive updates.
+                    const currentState = this.stateMap.get(eventName);
+                    // console.log(eventName, currentState);
+                    if (this.stateMap.has(eventName) === false) {
+                        throw new Error(`State for channel ${channel.name} not initialized`);
+                    };
+                    // Cast the message to the correct type
+                    const diffResult = message as unknown as DiffResult<T, T>;
+                    // Update the state
+                    const newState = mergeDiff(currentState, diffResult);
+                    // See if the new state is valid according to the state schema
+                    const valid = channel.schema.safeParse(newState).success;
+                    // Update the state validity and value, and call the handler if it is valid and if there are any changes
+                    if (valid) {
+                        this.statesValid.set(eventName, true);
+                        // Call the handler if there are any changes
+                        if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
+                            this.stateMap.set(eventName, newState);
+                            this.channelHandlersMap.get(eventName)?.forEach(handler => handler(newState));
+                        }
+                    } else {
+                        this.statesValid.set(eventName, false);
+                    }
+                    onReceiveStateMessage?.({
+                        message: message as unknown as WithMeta<StateMessage>,
+                        valid: valid,
+                        diffResult: diffResult,
+                        fullState: currentState as RecursivePartial<T>,
+                        sender
+                    });
+                    return;
                 }
-                onReceiveStateMessage?.({
-                    message: message as unknown as WithBaseMeta<BaseStateMessage>,
-                    valid: valid,
-                    diffResult: diffResult,
-                    fullState: currentState as RecursivePartial<T>,
-                    sender
-                });
-                return;
-            }
+                console.warn("Unrecognized message type for message: ", message);
+            });
+        }
+        // Add handler
+        if (onStateChange !== undefined) {
+            this.channelHandlersMap.get(eventName)?.push(onStateChange);
+        }
+    }
 
-            console.warn("Unrecognized message type for message: ", message);
-        });
+    unsub<T extends JSONValue>(channel: Channel<T>, onStateChange?: (state: T) => void): void {
+        const eventName = this.getChannelName(channel);
+        if (onStateChange !== undefined) {
+            const handlers = this.channelHandlersMap.get(eventName);
+            if (handlers !== undefined) {
+                const index = handlers.indexOf(onStateChange);
+                if (index !== -1) {
+                    handlers.splice(index, 1);
+                }
+            }
+        }
     }
 
     // Not recommended for use with allowDeletions since multiple clients can accidentally overwrite each other's state
     // Only use if you are sure that the state is not being updated by other clients
-    _setState<T extends JSONObject>(channel: Channel<T>, state: T, allowDeletions: boolean = false) {
+    _set<T extends JSONValue>(channel: Channel<T>, state: T, allowDeletions: boolean = false) {
         const currentState = this.stateMap.get(channelPrefix+channel.name);
         if (currentState === undefined) {
             throw new Error("Channel not found");
         }
         const diffResult = diff(currentState as T, state);
         // Disallow deletions of state properties
-        if (!allowDeletions && Object.keys(diffResult.deleted).length > 0) {
-            // @ts-ignore - somehow the types doesn't like we are setting RecursivePartial<RecursiveNull<T>> to {}. Works for now.
-            diffResult.deleted = {};
+        if (!allowDeletions) {
+            diffResult.deleted = undefined;
         }
         // Only emit if there are changes
-        if (Object.keys(diffResult.modified).length > 0 || Object.keys(diffResult.deleted).length > 0) {
+        if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
             this.stateMap.set(channelPrefix+channel.name, state);
             this.sendDiffState(channel, diffResult);
+            if (this.selfSubscribed) {
+                this.channelHandlersMap.get(channelPrefix+channel.name)?.forEach(handler => handler(state));
+            }
         }
     }
 
-    updateState<T extends JSONObject>(channel: Channel<T>, state: T) {
-        this._setState(channel, state);
+    pub<T extends JSONValue>(channel: Channel<T>, state: T) {
+        this._set(channel, state);
     }
 
-    getState<T extends JSONObject>(channel: Channel<T>): T {
+    get<T extends JSONValue>(channel: Channel<T>): T {
         const currentState = this.stateMap.get(channelPrefix+channel.name);
         if (currentState === undefined) {
             throw new Error("Channel not found");

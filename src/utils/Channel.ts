@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { JSONObject } from "./State";
+import { JSONValue } from "./JSON";
 
-export type Channel<T extends JSONObject> = {
+export type Channel<T extends JSONValue> = {
     name: string;
     schema: z.ZodSchema<T>;
 }

@@ -7,8 +7,8 @@ export type JSONValue =
     | JSONObject
     | JSONArray;
 
+export type JSONArray = JSONValue[];
+
 export interface JSONObject {
     [x: string]: JSONValue;
 }
-
-export interface JSONArray extends Array<JSONValue> { }

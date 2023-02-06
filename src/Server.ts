@@ -1,32 +1,33 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
 
 import { Server, Socket } from "socket.io";
-import { BaseStateClient} from "./utils/BaseStateClient";
+import { BaseStateClient, channelPrefix} from "./utils/BaseStateClient";
 import { Channel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
-import { JSONObject } from "./utils/State";
+import { JSONObject, JSONValue } from "./utils/JSON";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
 
-export class StateServer extends BaseStateClient {
+export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
-    // private socketHandlers: Map<string, (data: any, sender: Socket) => void>;
-    constructor(server: Server) {
-        super();
-        this.socket = server; // The socket server
+    private socket: Server;
+    constructor(server: Server, selfSubscribed: boolean = true) {
+        super(selfSubscribed);
+        this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
-        // this.socketHandlers = new Map(); // Map of socket event handlers (per socket)
         this.socket.on("connection", (socket) => {
-            console.log("Client connected: " + socket.id);
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
-            this.channelHandlers.forEach((listener, event) => {
-                socket.on(event, (data: any) => {
-                    listener(data, socket);
-                });
+            socket.onAny((event: string, data: any) => {
+                if (event.startsWith(channelPrefix)) {
+                    const handler = this.channelHandlers.get(event);
+                    if (handler) {
+                        handler(data, socket);
+                    }
+                }
             });
             socket.on("disconnect", () => {
                 console.log("Client disconnected: " + socket.id);
@@ -35,35 +36,25 @@ export class StateServer extends BaseStateClient {
         });
     }
     // General listener for event on all clients
-    protected socketOn(event: string, listener: (data: any, sender: Socket) => void): void {
+    protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
-        // Add handler to all existing clients
-        this.clientSockets.forEach((socket) => {
-            socket.on(event, (data) => {
-                listener(data, socket);
-            });
-        });
     }
-    protected socket: { emit: (event: string, ...args: any[]) => void; on: (event: string, listener: (...args: any[]) => void) => void; };
-    sendRequestFullState<T extends JSONObject>(channel: Channel<T>): void {
-        this.sendRawStateMessage(channel, {
-            requestFullState: true
-        });
+    protected emitRawEvent(event: string, data: any): void {
+        this.socket.emit(event, data);
     }
-    sendDiffState<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>): void {
-        this.sendRawStateMessage(channel, diffResult as JSONObject);
+    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
+        this.sendStateMessage(channel, diffResult as JSONObject);
     }
-    private relayStateMessage<T extends JSONObject>(channel: Channel<T>, diffResult: DiffResult<T>, sender: Socket): void {
-        sender.broadcast.emit(this.getChannelName(channel), this.wrapStateMessage(diffResult as JSONObject));
+    private relayStateMessage<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, sender: Socket): void {
+        sender.broadcast.emit(this.getChannelName(channel), this.wrapMessage(diffResult as JSONObject, "state"));
     }
-    addStateChannel<T extends JSONObject>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.addStateChannel(channel, 
+    sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+        super.sub(channel, 
             // Handle state changes
             handler, 
             // Handle on receive state message
             (event) => {
-                // Forwards state message to all clients
-                // this.sendDiffState(channel, event.diffResult);
+                // Forwards state message to all clients except sender
                 if (event.sender) {
                     this.relayStateMessage(channel, event.diffResult, event.sender);
                 } else {
