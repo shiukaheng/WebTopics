@@ -1,5 +1,5 @@
 {
-  "name": "socketio-state-share",
+  "name": "state-share",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
