@@ -141,7 +141,7 @@ export abstract class BaseStateClient<V = void> {
                     this.onReceiveStateMessage<T>(channel, msg as WithMeta<StateMessage>, sender);
                     return;
                 }
-                console.warn("Unrecognized message type for message: ", msg, stateMessageSchema.parse(msg));
+                console.warn(`Invalid message received for state channel ${channel.name}:`, msg);
             });
         }
         this.channelSchemaMap.set(eventName, channel.schema);
@@ -155,7 +155,17 @@ export abstract class BaseStateClient<V = void> {
         // Initialize channel
         const eventName = this.getChannelName(channel);
         const channelType = channel.mode;
+        this.listenCommandChannel(channel);
+        this.channelSchemaMap.set(eventName, channel.schema);
+        if (handler !== undefined) {
+            this.commandHandlerMap.set(eventName, handler as (command: JSONValue) => U);
+        }
+    }
+
+    private listenCommandChannel<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>) {
+        const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
+            this.channelSchemaMap.set(eventName, channel.schema);
             this.channelResponseSchemaMap.set(eventName, channel.responseSchema);
             // Add raw event listener
             this.onRawEvent(eventName, (msg: MessageMeta, sender: V) => {
@@ -167,16 +177,14 @@ export abstract class BaseStateClient<V = void> {
                 metaMessageSchema.parse(msg);
                 if (msg.messageType === "commandResponse" && commandResponseMessageSchema.safeParse(msg).success) {
                     this.onReceiveCommandResponseMessage<T, U>(channel, msg as WithMeta<CommandResponseMessage>, sender);
+                    return;
                 }
                 if (msg.messageType === "command" && commandMessageSchema.safeParse(msg).success) {
                     this.onReceiveCommandMessage<T, U>(channel, msg as WithMeta<CommandMessage>, sender);
+                    return;
                 }
-                console.warn("Unrecognized message type for message: ", msg);
+                console.warn(`Invalid message received for command channel ${channel.name}:`, msg);
             });
-        }
-        this.channelSchemaMap.set(eventName, channel.schema);
-        if (handler !== undefined) {
-            this.commandHandlerMap.set(eventName, handler as (command: JSONValue) => U);
         }
     }
 
@@ -195,12 +203,14 @@ export abstract class BaseStateClient<V = void> {
         if (msg.noHandler) {
             rejector(new Error("No command handler"));
         } else {
+            // console.log("Resolving command promise");
             resolver(msg.responseData as U);
         }
     }
 
     protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: V) {
         // Get the handler
+        // console.log("Received command message: ", msg);
         const eventName = this.getChannelName(channel);
         const handler = this.commandHandlerMap.get(eventName);
         if (handler === undefined) {
@@ -290,6 +300,8 @@ export abstract class BaseStateClient<V = void> {
     }
 
     req<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, commandData: T, dest: DestType, timeout: number=10000): Promise<U> {
+        // console.log(Date.now())
+        this.listenCommandChannel(channel);
         if (channel.mode !== "command") {
             throw new Error("Channel is not a command channel");
         }

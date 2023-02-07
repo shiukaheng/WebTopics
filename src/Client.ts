@@ -11,11 +11,15 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 
 export class StateClient extends BaseStateClient {
     private socket: Socket;
+    public serverID: string | undefined;
     constructor(serverURL: string, selfSubscribed: boolean = true) {
         super(selfSubscribed);
         this.socket = io(serverURL);
         this.socket.on("connect", () => {
             this.socket.emit("id", this.id);
+        });
+        this.socket.on("id", (data: any) => {
+            this.serverID = data as string;
         });
     }
     protected onRawEvent(event: string, listener: (data: any) => void): void {

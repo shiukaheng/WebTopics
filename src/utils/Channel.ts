@@ -8,22 +8,20 @@ export const channelModeSchema = z.union([
 
 export type ChannelMode = z.infer<typeof channelModeSchema>;
 
-export type Channel<T extends JSONValue, U extends JSONValue | void = void> = {
+export type Channel<T extends JSONValue> = {
     name: string;
     mode: ChannelMode;
     schema: z.ZodSchema<T>;
-    responseSchema?: z.ZodSchema<U>;
 }
 
 export const channelSchema = z.object({
     name: z.string(),
     mode: channelModeSchema,
     schema: z.unknown(),
-    responseSchema: z.unknown().optional(),
 });
 
 export type CommandChannel<T extends JSONValue, U extends JSONValue> = Channel<T> & {
-    // mode: "command";
+    mode: "command";
     responseSchema: z.ZodSchema<U>;
 }
 
@@ -33,7 +31,7 @@ export const commandChannelSchema = channelSchema.extend({
 });
 
 export type StateChannel<T extends JSONValue> = Channel<T> & {
-    // mode: "state";
+    mode: "state";
 }
 
 export const stateChannelSchema = channelSchema.extend({

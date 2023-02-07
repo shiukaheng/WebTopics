@@ -12,6 +12,7 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // Make server mirror client messages so they get broadcasted to all clients
 
 // TODO: Block spoofed messages
+// TODO: Server responses are currently broadcasted. We should probably add destination IDs to emitRawEvent and only send to those clients
 
 export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
@@ -45,6 +46,8 @@ export class StateServer extends BaseStateClient<Socket> {
                     this.socketToClientID.delete(socket.id);
                 }
             });
+            // Send server ID to client
+            socket.emit("id", this.id);
         });
         this.onRawEvent("id", (data: any, sender: Socket) => {
             // Check if client ID is already in use
@@ -82,8 +85,10 @@ export class StateServer extends BaseStateClient<Socket> {
                     } else {
                         throw new Error(`Client ${clientID} has socket ID ${socketID} but socket not found`);
                     }
+                } else if (clientID === this.id) {
+                    // Ignore server
                 } else {
-                    console.warn(`Client ${clientID} not connected, skipping message`);
+                    console.warn(`Client ${clientID} not found`);
                 }
             }
             // Send message to all sockets

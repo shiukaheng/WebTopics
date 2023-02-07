@@ -28,6 +28,12 @@ stateClient1.sub(testChannel, (state) => {
     console.log(`Client 1 received state: ${JSON.stringify(state)}`)
 });
 
+// Client 2
+const stateClient2 = new StateClient("http://localhost:3000");
+stateClient2.sub(testChannel, (state) => {
+    console.log(`Client 2 received state: ${JSON.stringify(state)}`)
+});
+
 // Send updates regularly from client 1
 setInterval(() => {
     stateClient1.pub(testChannel, {
