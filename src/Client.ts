@@ -1,15 +1,15 @@
-// Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
+// Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
 import { io, Socket } from "socket.io-client";
-import { BaseStateClient} from "./utils/BaseStateClient";
-import { Channel, StateChannel } from "./utils/Channel";
+import { BaseClient} from "./utils/BaseClient";
+import { Channel, TopicChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
 
-export class StateClient extends BaseStateClient {
+export class TopicClient extends BaseClient {
     private socket: Socket;
     public serverID: string | undefined;
     constructor(serverURL: string, selfSubscribed: boolean = true) {
@@ -28,9 +28,9 @@ export class StateClient extends BaseStateClient {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    // sub<T extends JSONValue>(channel: StateChannel<T>, handler?: ((state: T) => void) | undefined): void {
+    // sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: ((topic: T) => void) | undefined): void {
     //     super.sub(channel, 
-    //         // Handle state changes
+    //         // Handle topic changes
     //         handler
     //     );
     // }

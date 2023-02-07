@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { CommandChannel, StateChannel } from "./Channel";
+import { CommandChannel, TopicChannel } from "./Channel";
 import { JSONValue } from "./JSON";
 
-export function createStateChannel<T extends JSONValue>(name: string, schema: z.ZodSchema<T>): StateChannel<T> {
+export function createTopicChannel<T extends JSONValue>(name: string, schema: z.ZodSchema<T>): TopicChannel<T> {
     return {
-        mode: "state",
+        mode: "topic",
         name,
         schema
     }

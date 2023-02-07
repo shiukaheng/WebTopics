@@ -2,7 +2,7 @@ import { z } from "zod";
 import { JSONValue } from "./JSON";
 
 export const channelModeSchema = z.union([
-    z.literal("state"),
+    z.literal("topic"),
     z.literal("command"),
 ]);
 
@@ -30,10 +30,10 @@ export const commandChannelSchema = channelSchema.extend({
     responseSchema: z.unknown(),
 });
 
-export type StateChannel<T extends JSONValue> = Channel<T> & {
-    mode: "state";
+export type TopicChannel<T extends JSONValue> = Channel<T> & {
+    mode: "topic";
 }
 
-export const stateChannelSchema = channelSchema.extend({
-    mode: z.literal("state"),
+export const topicChannelSchema = channelSchema.extend({
+    mode: z.literal("topic"),
 });

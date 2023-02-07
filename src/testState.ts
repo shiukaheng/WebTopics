@@ -1,45 +1,45 @@
 import { z } from "zod";
 import { Server } from "socket.io";
-import { StateServer } from "./Server";
-import { StateClient } from "./Client";
-import { StateChannel } from "./utils/Channel";
-import { createCommandChannel, createStateChannel } from "./utils/createChannel";
+import { TopicServer } from "./Server";
+import { TopicClient } from "./Client";
+import { TopicChannel } from "./utils/Channel";
+import { createCommandChannel, createTopicChannel } from "./utils/createChannel";
 
-const stateChannel = createStateChannel("test",
+const topicChannel = createTopicChannel("test",
     z.object({
         a: z.string(),
         b: z.number()
     })
 )
 
-const socketIOServer = new Server(3000);
-const stateServer = new StateServer(socketIOServer);
+const socketIOServer = new Server(3001);
+const topicServer = new TopicServer(socketIOServer);
 
-stateServer.sub(stateChannel, (state) => {
-    console.log(`Server received state: ${JSON.stringify(state)}`)
+topicServer.sub(topicChannel, (topic) => {
+    console.log(`Server received topic: ${JSON.stringify(topic)}`)
 });
 
 // Client 1
-const stateClient1 = new StateClient("http://localhost:3000");
-stateClient1.sub(stateChannel, (state) => {
-    console.log(`Client 1 received state: ${JSON.stringify(state)}`)
+const topicClient1 = new TopicClient("http://localhost:3001");
+topicClient1.sub(topicChannel, (topic) => {
+    console.log(`Client 1 received topic: ${JSON.stringify(topic)}`)
 });
 
 // Client 2
-const stateClient2 = new StateClient("http://localhost:3000");
-stateClient2.sub(stateChannel, (state) => {
-    console.log(`Client 2 received state: ${JSON.stringify(state)}`)
+const topicClient2 = new TopicClient("http://localhost:3001");
+topicClient2.sub(topicChannel, (topic) => {
+    console.log(`Client 2 received topic: ${JSON.stringify(topic)}`)
 });
 
 // Client 3
-const stateClient3 = new StateClient("http://localhost:3000");
-stateClient3.sub(stateChannel, (state) => {
-    console.log(`Client 3 received state: ${JSON.stringify(state)}`)
+const topicClient3 = new TopicClient("http://localhost:3001");
+topicClient3.sub(topicChannel, (topic) => {
+    console.log(`Client 3 received topic: ${JSON.stringify(topic)}`)
 });
 
 // Send updates regularly from client 1
 setInterval(() => {
-    stateClient1.pub(stateChannel, {
+    topicClient1.pub(topicChannel, {
         a: "test",
         b: Math.random()
     });

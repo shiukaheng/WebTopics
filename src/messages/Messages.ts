@@ -3,8 +3,8 @@ import { z } from "zod";
 // Generic message types
 
 export const messageTypeSchema = z.union([
-    z.literal("state"),
-    z.literal("requestFullState"),
+    z.literal("topic"),
+    z.literal("requestFullTopic"),
     z.literal("command"),
     z.literal("commandResponse"),
 ])
@@ -22,15 +22,15 @@ export const metaMessageSchema = z.object({
 export type MessageMeta = z.infer<typeof metaMessageSchema>;
 
 /**
- * Message requesting the full state
+ * Message requesting the full topic
  * Could be:
- * - New client joining sending to server -> Server needs to process the message and send the unioned full state message from all clients
- * - Server broadcasting to all clients -> Client needs to process the message and send a full state message
+ * - New client joining sending to server -> Server needs to process the message and send the unioned full topic message from all clients
+ * - Server broadcasting to all clients -> Client needs to process the message and send a full topic message
  */
-export const requestFullStateMessageSchema = z.object({
-    requestFullState: z.literal(true),
+export const requestFullTopicMessageSchema = z.object({
+    requestFullTopic: z.literal(true),
 });
-export type RequestFullStateMessage = z.infer<typeof requestFullStateMessageSchema>;
+export type RequestFullTopicMessage = z.infer<typeof requestFullTopicMessageSchema>;
 
 export const jsonValueSchema = z.union([
     z.string(),
@@ -43,13 +43,13 @@ export const jsonValueSchema = z.union([
 ]);
 
 /**
- * Message containing the partial state
+ * Message containing the partial topic
  */
-export const stateMessageSchema = z.object({
+export const topicMessageSchema = z.object({
     modified: jsonValueSchema.optional(),
     deleted: jsonValueSchema.optional()
 });
-export type StateMessage = z.infer<typeof stateMessageSchema>;
+export type TopicMessage = z.infer<typeof topicMessageSchema>;
 
 /**
  * Message for a command

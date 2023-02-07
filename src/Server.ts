@@ -1,10 +1,10 @@
-// Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
+// Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
 import { Server, Socket } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { WithMeta, StateMessage, RequestFullStateMessage, CommandMessage, MessageMeta, CommandResponseMessage } from "./messages/Messages";
-import { BaseStateClient, channelPrefix, DestType} from "./utils/BaseStateClient";
-import { Channel, CommandChannel, StateChannel } from "./utils/Channel";
+import { WithMeta, TopicMessage, RequestFullTopicMessage, CommandMessage, MessageMeta, CommandResponseMessage } from "./messages/Messages";
+import { BaseClient, channelPrefix, DestType} from "./utils/BaseClient";
+import { Channel, CommandChannel, TopicChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
 
@@ -14,7 +14,7 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // TODO: Block spoofed messages
 // TODO: Server responses are currently broadcasted. We should probably add destination IDs to emitRawEvent and only send to those clients
 
-export class StateServer extends BaseStateClient<Socket> {
+export class TopicServer extends BaseClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
     private socket: Server;
@@ -30,7 +30,7 @@ export class StateServer extends BaseStateClient<Socket> {
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
             socket.onAny((event: string, data: any) => {
-                if (event.startsWith(channelPrefix) || StateServer.metaChannels.includes(event)) {
+                if (event.startsWith(channelPrefix) || TopicServer.metaChannels.includes(event)) {
                     const handler = this.channelHandlers.get(event);
                     if (handler) {
                         handler(data, socket);
@@ -129,17 +129,17 @@ export class StateServer extends BaseStateClient<Socket> {
         }
     }
 
-    protected onReceiveStateMessage<T extends JSONValue>(channel: StateChannel<T>, msg: WithMeta<StateMessage>, sender: Socket): void {
-        super.onReceiveStateMessage(channel, msg, sender);
-        // TODO: Forwards state message to all clients except sender
+    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender: Socket): void {
+        super.onReceiveTopicMessage(channel, msg, sender);
+        // TODO: Forwards topic message to all clients except sender
         sender.broadcast.emit(this.getChannelName(channel), msg);
     }
 
-    // Server should always know the full state, so this is not needed:
-    // protected onReceiveRequestFullStateMessage<T extends JSONValue>(channel: StateChannel<T>, msg: WithMeta<RequestFullStateMessage>, sender: Socket): void {
-    //     super.onReceiveRequestFullStateMessage(channel, msg, sender);
-    //     // TODO: Forwards request full state message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
-    //     // Alternatively: Broadcast to all clients to request full state, and only after all clients have responded, send complete state as one message
+    // Server should always know the full topic, so this is not needed:
+    // protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender: Socket): void {
+    //     super.onReceiveRequestFullTopicMessage(channel, msg, sender);
+    //     // TODO: Forwards request full topic message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
+    //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
     // };
 
     protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: Socket): void {
