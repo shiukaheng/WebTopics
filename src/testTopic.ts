@@ -3,9 +3,9 @@ import { Server } from "socket.io";
 import { TopicServer } from "./Server";
 import { TopicClient } from "./Client";
 import { TopicChannel } from "./utils/Channel";
-import { createServiceChannel, createTopicChannel } from "./utils/createChannel";
+import { createChannel, createTopic } from "./utils/createChannel";
 
-const topicChannel = createTopicChannel("test",
+const topicChannel = createTopic("test",
     z.object({
         a: z.string(),
         b: z.number()
