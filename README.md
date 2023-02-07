@@ -1,49 +1,56 @@
 # ⚡️ state-share
-Tiny pub/sub library to share and collaboratively edit typed objects through Socket.IO and Zod. Meant to be used on local networks.
-### Features / behaviour
-- Fully bi-directional
-- Publishes partial changes
-  - Allows for multiple clients publishing on same object without knowing 
-## Usage
-### 1️⃣ Create channel definitions
-```typescript
-import { z } from "zod";
 
-export const sensorValueSchema = z.object({
-  "temperature": z.number(),
-  "humidity": z.number()
-})
-export type SensorValue = z.infer<typeof sensorValueSchema>
-export const sensorChannel: Channel = {
-  name: "sensor",
-  schema: sensorValueSchema
-}
-```
-### 2️⃣ Declare channels on server
-```typescript
-import { Server } from "socket.io";
-import { StateServer } from "state-share";
-import { sensorChannel } from "./channelDefs"
+Real-time topics and services for web apps using Socket.io and Zod, inspired by ROS
+Meant for use in low-latency interactive applications to share state on local networks
+### Features
+- Typed and validated topics and services via Zod
+  ```typescript
+  const SensorTopic = createTopic("sensor", z.object({
+    "temperature": z.number(),
+    "humidity": z.number()
+  }))
+  client.pub(SensorTopic, {temperature: 20, humidity: "50%"}) // Error: Expected number, received string
+  ```
+- Collaborative topics
+  ```typescript
+  client1.pub(channel, {a: "1"})
+  client2.pub(channel, {b: "2"})
+  client3.sub(channel, (value) => {
+    console.log(value) // {a: "1", b: "2"}
+  })
+  ```
+- Async service calls
+  ```typescript
+  const AdditionService = createService("add", 
+    // Request schema
+    z.object({
+      "a": z.number(),
+      "b": z.number()
+    }), 
+    // Response schema
+    z.number()
+  )
+  ...
 
-// Create server
-const socketServer = new Server(3000);
-const server = new StateServer(socketServer, [sensorChannel])
-```
-### 3️⃣ Use on client to update state
-```typescript
-// Create client
-const socketClient = io("http://localhost:3000");
-const client = new StateClient(socketClient, [sensorChannel])
+  // Call service
+  const result = await client.call(AdditionService, {a: 1, b: 2}) // Promise<number>
+  ```
+- Packagable channels for easy sharing between client and server
+  ```typescript
+  export const AdditionService = createService("add", 
+    z.object({
+      "a": z.number(),
+      "b": z.number()
+    }), 
+    z.number()
+  )
 
-// Update state
-onNewSensorValue((value) => {
-  client.pub(sensorChannel, value)
-})
-```
-### 4️⃣ Use on client to subscribe to state changes
-```typescript
-// Subscribe to state changes
-stateClient.sub(sensorChannel, (value) => {
-  console.log(value)
-})
-```
+  export const SensorTopic = createTopic("sensor", z.object({
+    "temperature": z.number(),
+    "humidity": z.number()
+  }))
+  ...
+
+  // Client and server can share the same channels from an external package
+  import {AdditionService, SensorTopic} from "channels"
+  ```
