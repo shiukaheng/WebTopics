@@ -57,7 +57,7 @@ Meant for use in low-latency interactive applications on local networks.
 
 # To do
 - [ ] Different namespaces for topics and services
-- [ ] Client listing via meta topic
+- [ ] Client service and topic listing via topics
 - [ ] Support for service calls with multiple destinations
 
 # API
