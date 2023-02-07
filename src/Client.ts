@@ -24,9 +24,6 @@ export class StateClient extends BaseStateClient {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
-        this.sendStateMessage(channel, diffResult as JSONObject);
-    }
     sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
         super.sub(channel, 
             // Handle state changes

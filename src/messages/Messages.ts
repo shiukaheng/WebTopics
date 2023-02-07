@@ -14,6 +14,11 @@ export type MessageType = z.infer<typeof messageTypeSchema>;
 export const metaMessageSchema = z.object({
     timestamp: z.number(),
     messageType: messageTypeSchema,
+    source: z.array(z.string()), // Allow for multiple updates to be combined by the server (not implemented yet)
+    dest: z.union([
+        z.array(z.string()),
+        z.literal("*")
+    ]), // Allow multiple clients to receive the same message
 });
 
 export type MessageMeta = z.infer<typeof metaMessageSchema>;
@@ -38,4 +43,5 @@ export const stateMessageSchema = z.object({
 });
 export type StateMessage = z.infer<typeof stateMessageSchema>;
 
-export type WithMeta<T> = T & { meta: MessageMeta };
+export type WithMeta<T> = T & MessageMeta;
+export type Message<T> = {data: T} & MessageMeta

@@ -62,9 +62,6 @@ export class StateServer extends BaseStateClient<Socket> {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void {
-        this.sendStateMessage(channel, diffResult as JSONObject);
-    }
     private relayStateMessage<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, sender: Socket): void {
         sender.broadcast.emit(this.getChannelName(channel), this.wrapMessage(diffResult as JSONObject, "state"));
     }
@@ -75,8 +72,8 @@ export class StateServer extends BaseStateClient<Socket> {
             // Handle on receive state message
             (event) => {
                 // Forwards state message to all clients except sender
-                if (event.sender) {
-                    this.relayStateMessage(channel, event.diffResult, event.sender);
+                if (event.socket) {
+                    this.relayStateMessage(channel, event.diffResult, event.socket);
                 } else {
                     throw new Error("No sender for state message?");
                 }

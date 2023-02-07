@@ -13,14 +13,16 @@ import { JSONObject, JSONValue } from "./JSON";
 export const channelPrefix = "ch-";
 
 export type OnReceiveStateMessageArgs<T extends JSONValue, V = void> = {
-    sender?: V;
+    socket?: V;
     message: WithMeta<StateMessage>, valid: boolean, diffResult: DiffResult<T, T>, fullState: RecursivePartial<T>
 }
 
 export type OnReceiveRequestFullStateMessageArgs<V = void> = {
-    sender?: V;
+    socket?: V;
     message: WithMeta<requestFullStateMessage>, alreadyHasFullState: boolean
 }
+
+export type DestType = string[] | "*";
 
 export abstract class BaseStateClient<V = void> {
     protected channelMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
@@ -37,7 +39,6 @@ export abstract class BaseStateClient<V = void> {
     // Abstract methods
     protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
     protected abstract emitRawEvent(event: string, data: any): void;
-    abstract sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>): void;
 
     // Default constructor
 	constructor(selfSubscribed: boolean = true) {
@@ -55,15 +56,19 @@ export abstract class BaseStateClient<V = void> {
     }
 
     // Messages
-    protected wrapMessage(rawMessage: JSONObject, messageType: MessageType): MessageMeta {
-        return {...rawMessage, timestamp: Date.now(), messageType};
+    protected wrapMessage(rawMessage: JSONObject, messageType: MessageType, dest?: DestType, source?: string[]): MessageMeta {
+        return {...rawMessage, timestamp: Date.now(), messageType, source: source ?? [this.id], dest: dest ?? "*"};
     }
 
-    protected sendStateMessage<T extends JSONValue>(channel: Channel<T>, diff: DiffResult<T, T>) {
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state"));
+    protected sendStateMessage<T extends JSONValue>(channel: Channel<T>, diff: DiffResult<T, T>, dest?: DestType, source?: string[]): void {
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state", dest, source));
     }
 
-    sendFullState<T extends JSONValue>(channel: Channel<T>): void {
+    sendDiffState<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, dest?: DestType, source?: string[]): void {
+        this.sendStateMessage(channel, diffResult as JSONObject, dest, source);
+    }
+
+    sendFullState<T extends JSONValue>(channel: Channel<T>, dest?: DestType, source?: string[]): void {
         // Try to get full state from channel
         const fullState = this.get(channel);
         if (fullState === undefined) {
@@ -73,12 +78,12 @@ export abstract class BaseStateClient<V = void> {
             this.sendDiffState(channel, {
                 // @ts-ignore - this is a valid state, but the type system doesn't know that
                 modified: fullState
-            });
+            }, source, dest);
         }
     }
 
-    sendRequestFullState<T extends JSONValue>(channel: Channel<T>): void {
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState"));
+    sendRequestFullState<T extends JSONValue>(channel: Channel<T>, dest?: DestType, source?: string[]): void {
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState", dest, source));
     }
 
     sub<T extends JSONValue>(channel: Channel<T>, onStateChange?: (state: T) => void, 
@@ -112,7 +117,7 @@ export abstract class BaseStateClient<V = void> {
                     onReceiveRequestFullStateMessage?.({
                         message: message as unknown as WithMeta<requestFullStateMessage>,
                         alreadyHasFullState: this.hasValidState(channel),
-                        sender: sender
+                        socket: sender
                     });
                     return;
                 } 
@@ -147,7 +152,7 @@ export abstract class BaseStateClient<V = void> {
                         valid: valid,
                         diffResult: diffResult,
                         fullState: currentState as RecursivePartial<T>,
-                        sender
+                        socket: sender
                     });
                     return;
                 }
@@ -175,7 +180,7 @@ export abstract class BaseStateClient<V = void> {
 
     // Not recommended for use with allowDeletions since multiple clients can accidentally overwrite each other's state
     // Only use if you are sure that the state is not being updated by other clients
-    _set<T extends JSONValue>(channel: Channel<T>, state: T, allowDeletions: boolean = false) {
+    _set<T extends JSONValue>(channel: Channel<T>, state: T, allowDeletions: boolean = false, dest?: DestType, source?: string[]): void {
         const currentState = this.stateMap.get(channelPrefix+channel.name);
         if (currentState === undefined) {
             throw new Error("Channel not found");
@@ -188,15 +193,15 @@ export abstract class BaseStateClient<V = void> {
         // Only emit if there are changes
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
             this.stateMap.set(channelPrefix+channel.name, state);
-            this.sendDiffState(channel, diffResult);
+            this.sendDiffState(channel, diffResult, dest, source);
             if (this.selfSubscribed) {
                 this.channelHandlersMap.get(channelPrefix+channel.name)?.forEach(handler => handler(state));
             }
         }
     }
 
-    pub<T extends JSONValue>(channel: Channel<T>, state: T) {
-        this._set(channel, state);
+    pub<T extends JSONValue>(channel: Channel<T>, state: T, dest?: DestType, source?: string[],): void {
+        this._set(channel, state, false, dest, source);
     }
 
     get<T extends JSONValue>(channel: Channel<T>): T {
