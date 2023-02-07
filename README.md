@@ -33,7 +33,7 @@ Meant for use in low-latency interactive applications on local networks.
   ...
 
   // Call service
-  const result = await client.call(AdditionService, {a: 1, b: 2}) // Promise<number>
+  const result = await client.req(AdditionService, {a: 1, b: 2}) // Promise<number>
   ```
 - Packagable channels for easy sharing between client and server
   ```typescript
