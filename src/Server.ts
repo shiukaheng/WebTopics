@@ -9,6 +9,8 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
 
+// TODO: Block spoofed messages
+
 export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;

@@ -1,8 +1,6 @@
 import { cloneDeep, isEqual } from 'lodash';
 import { JSONObject, JSONValue } from './JSON';
 
-// TODO: Fix types!!!
-
 type Primitive<U> = string | number | boolean | null | Array<U>;
 
 // RecursiveNull - makes all properties of an object null recursively, 
@@ -87,7 +85,7 @@ export function diff<T extends JSONValue, U extends JSONValue>(oldValue: T, newV
             } else {
                 // Else (object), recurse and merge results
                 // Union the keys of the two objects
-                const keys = new Set([...Object.keys(oldValue), ...Object.keys(newValue)]);
+                const keys = new Set([...Object.keys(oldValue as object), ...Object.keys(newValue as object)]);
                 for (const key of keys) {
                     // @ts-ignore - creating new property
                     const oldSubValue = oldValue[key as string];
@@ -123,6 +121,7 @@ export function diff<T extends JSONValue, U extends JSONValue>(oldValue: T, newV
 
 // A valid Diff should not have a property in both modified and deleted, but our function will be lenient and allow it by applying deleted first, then modified
 export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T | undefined, diff: DiffResult<T, U>): any {
+    // @ts-ignore - temporary fix for type bug
     const deleted = recursiveDelete(oldValue, diff.deleted);
     const modified = recursiveMerge(deleted as JSONValue | undefined, diff.modified);
     return modified;

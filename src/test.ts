@@ -16,13 +16,13 @@ const testChannel = {
 const socketIOServer = new Server(3000);
 const stateServer = new StateServer(socketIOServer);
 
-stateServer.sub(testChannel, (state) => {
+stateServer.serve(testChannel, (state) => {
     console.log(`Server received state: ${JSON.stringify(state)}`)
 });
 
 // Client 1
 const stateClient1 = new StateClient("http://localhost:3000");
-stateClient1.sub(testChannel, (state) => {
+stateClient1.serve(testChannel, (state) => {
     console.log(`Client 1 received state: ${JSON.stringify(state)}`)
 });
 

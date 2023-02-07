@@ -24,8 +24,8 @@ export class StateClient extends BaseStateClient {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.sub(channel, 
+    serve<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
+        super.serve(channel, 
             // Handle state changes
             handler
         );
