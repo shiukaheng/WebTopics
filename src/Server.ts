@@ -15,6 +15,7 @@ export class StateServer extends BaseStateClient<Socket> {
     private socket: Server;
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
+    static metaChannels = ["id"]; // Extra channels the server handles with onRawEvent
     constructor(server: Server, selfSubscribed: boolean = true) {
         super(selfSubscribed);
         this.socket = server;
@@ -24,7 +25,7 @@ export class StateServer extends BaseStateClient<Socket> {
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
             socket.onAny((event: string, data: any) => {
-                if (event.startsWith(channelPrefix)) {
+                if (event.startsWith(channelPrefix) || StateServer.metaChannels.includes(event)) {
                     const handler = this.channelHandlers.get(event);
                     if (handler) {
                         handler(data, socket);
@@ -44,18 +45,14 @@ export class StateServer extends BaseStateClient<Socket> {
         this.onRawEvent("id", (data: any, sender: Socket) => {
             // Check if client ID is already in use
             if (this.clientToSocketID.has(data)) {
-                // Disconnect old client
-                const oldSocketID = this.clientToSocketID.get(data);
-                if (oldSocketID !== undefined) {
-                    const oldSocket = this.clientSockets.get(oldSocketID);
-                    if (oldSocket !== undefined) {
-                        oldSocket.disconnect();
-                        console.warn("Client ID already in use, disconnecting old client");
-                    }
-                }
+                // Disconnect this client
+                sender.disconnect();
+                console.warn(`Client ${data} already connected, disconnecting`);
+                return;
             }
             this.clientToSocketID.set(sender.id, data);
             this.socketToClientID.set(data, sender.id);
+            console.log(`Client ${data} connected: ${sender.id}`)
         });
     }
     // General listener for event on all clients
