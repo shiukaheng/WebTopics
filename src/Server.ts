@@ -73,6 +73,9 @@ export class StateServer extends BaseStateClient<Socket> {
             (event) => {
                 // Forwards state message to all clients except sender
                 if (event.socket) {
+                    // TODO:
+                    // Check if the source is genuine
+                    // Relay message with respect to destinations specified in message
                     this.relayStateMessage(channel, event.diffResult, event.socket);
                 } else {
                     throw new Error("No sender for state message?");

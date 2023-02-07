@@ -21,3 +21,22 @@ export const channelSchema = z.object({
     schema: z.unknown(),
     responseSchema: z.unknown().optional(),
 });
+
+export type CommandChannel<T extends JSONValue> = Channel<T> & {
+    mode: "command";
+    responseSchema: z.ZodSchema<T>;
+}
+
+export const commandChannelSchema = channelSchema.extend({
+    mode: z.literal("command"),
+    responseSchema: z.unknown(),
+});
+
+export type StateChannel<T extends JSONValue> = Channel<T> & {
+    mode: "state";
+}
+
+export const stateChannelSchema = channelSchema.extend({
+    mode: z.literal("state"),
+});
+

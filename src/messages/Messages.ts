@@ -5,6 +5,8 @@ import { z } from "zod";
 export const messageTypeSchema = z.union([
     z.literal("state"),
     z.literal("requestFullState"),
+    z.literal("command"),
+    z.literal("commandResponse")
 ])
 export type MessageType = z.infer<typeof messageTypeSchema>;
 
@@ -42,5 +44,22 @@ export const stateMessageSchema = z.object({
     deleted: z.record(z.unknown()).optional(),
 });
 export type StateMessage = z.infer<typeof stateMessageSchema>;
+
+/**
+ * Message for a command
+ */
+export const commandMessageSchema = z.object({
+    commandData: z.unknown(),
+    commandId: z.string() // For matching up responses
+});
+export type CommandMessage = z.infer<typeof commandMessageSchema>;
+
+/**
+ * Message for a command response
+ */
+export const commandResponseMessageSchema = z.object({
+    commandData: z.unknown(),
+    commandId: z.string()
+});
 
 export type WithMeta<T> = T & MessageMeta;

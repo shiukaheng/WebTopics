@@ -70,7 +70,7 @@ export abstract class BaseStateClient<V = void> {
 
     sendFullState<T extends JSONValue>(channel: Channel<T>, dest?: DestType, source?: string[]): void {
         // Try to get full state from channel
-        const fullState = this.get(channel);
+        const fullState = this.getState(channel);
         if (fullState === undefined) {
             console.warn(`Cannot send full state for channel ${channel.name} - no full state available`);
             return;
@@ -121,7 +121,6 @@ export abstract class BaseStateClient<V = void> {
                     });
                     return;
                 } 
-                
                 // Handle state update
                 if (message.messageType === "state") {
                     // See if we have the state initialized. It should, because we need to initalize it before we can receive updates.
@@ -155,6 +154,20 @@ export abstract class BaseStateClient<V = void> {
                         socket: sender
                     });
                     return;
+                }
+                // Handle command
+                if (message.messageType === "command") {
+                    // TODO:
+                    // Run the handler, which is supposed to give a response that matches the response schema
+                    // The handler could be async.
+                    // Once the handler is done, validate the response and send it back to the sender using the same command id
+                }
+                // Handle response
+                if (message.messageType === "commandResponse") {
+                    // TODO:
+                    // Check if there is a pending command with the same id (we probably need a set for this)
+                    // If there is, validate the response and resolve the promise
+                    // If there isn't, ignore the response and log a warning
                 }
                 console.warn("Unrecognized message type for message: ", message);
             });
@@ -204,7 +217,7 @@ export abstract class BaseStateClient<V = void> {
         this._set(channel, state, false, dest, source);
     }
 
-    get<T extends JSONValue>(channel: Channel<T>): T {
+    protected getState<T extends JSONValue>(channel: Channel<T>): T {
         const currentState = this.stateMap.get(channelPrefix+channel.name);
         if (currentState === undefined) {
             throw new Error("Channel not found");
