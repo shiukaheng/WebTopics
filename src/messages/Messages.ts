@@ -5,8 +5,8 @@ import { z } from "zod";
 export const messageTypeSchema = z.union([
     z.literal("topic"),
     z.literal("requestFullTopic"),
-    z.literal("command"),
-    z.literal("commandResponse"),
+    z.literal("service"),
+    z.literal("serviceResponse"),
 ])
 export type MessageType = z.infer<typeof messageTypeSchema>;
 
@@ -52,27 +52,27 @@ export const topicMessageSchema = z.object({
 export type TopicMessage = z.infer<typeof topicMessageSchema>;
 
 /**
- * Message for a command
+ * Message for a service
  */
-export const commandMessageSchema = z.object({
-    commandData: jsonValueSchema,
-    commandId: z.string(), // For matching up responses,
+export const serviceMessageSchema = z.object({
+    serviceData: jsonValueSchema,
+    serviceId: z.string(), // For matching up responses,
     dest: z.union([
         z.array(z.string()),
         z.literal("*")
     ]), // Allow multiple clients to receive the same message
 });
-export type CommandMessage = z.infer<typeof commandMessageSchema>;
+export type ServiceMessage = z.infer<typeof serviceMessageSchema>;
 
 /**
- * Message for a command response
+ * Message for a service response
  */
-export const commandResponseMessageSchema = z.object({
+export const serviceResponseMessageSchema = z.object({
     responseData: jsonValueSchema,
-    commandId: z.string(),
-    dest: z.string(), // A command is only possibly requested by one client
+    serviceId: z.string(),
+    dest: z.string(), // A service is only possibly requested by one client
     noHandler: z.boolean().optional(),
 });
-export type CommandResponseMessage = z.infer<typeof commandResponseMessageSchema>;
+export type ServiceResponseMessage = z.infer<typeof serviceResponseMessageSchema>;
 
 export type WithMeta<T> = T & MessageMeta;

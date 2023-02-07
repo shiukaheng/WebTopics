@@ -3,7 +3,7 @@ import { JSONValue } from "./JSON";
 
 export const channelModeSchema = z.union([
     z.literal("topic"),
-    z.literal("command"),
+    z.literal("service"),
 ]);
 
 export type ChannelMode = z.infer<typeof channelModeSchema>;
@@ -20,13 +20,13 @@ export const channelSchema = z.object({
     schema: z.unknown(),
 });
 
-export type CommandChannel<T extends JSONValue, U extends JSONValue> = Channel<T> & {
-    mode: "command";
+export type ServiceChannel<T extends JSONValue, U extends JSONValue> = Channel<T> & {
+    mode: "service";
     responseSchema: z.ZodSchema<U>;
 }
 
-export const commandChannelSchema = channelSchema.extend({
-    mode: z.literal("command"),
+export const serviceChannelSchema = channelSchema.extend({
+    mode: z.literal("service"),
     responseSchema: z.unknown(),
 });
 

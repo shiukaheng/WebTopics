@@ -2,9 +2,9 @@
 
 import { Server, Socket } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { WithMeta, TopicMessage, RequestFullTopicMessage, CommandMessage, MessageMeta, CommandResponseMessage } from "./messages/Messages";
+import { WithMeta, TopicMessage, RequestFullTopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
 import { BaseClient, channelPrefix, DestType} from "./utils/BaseClient";
-import { Channel, CommandChannel, TopicChannel } from "./utils/Channel";
+import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
 
@@ -142,19 +142,19 @@ export class TopicServer extends BaseClient<Socket> {
     //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
     // };
 
-    protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: Socket): void {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender: Socket): void {
         // TODO: Skip if server not a recipient
         if (msg.dest === "*" || msg.dest.includes(this.id)) {
-            super.onReceiveCommandMessage(channel, msg, sender);
+            super.onReceiveServiceMessage(channel, msg, sender);
         }
-        // TODO: Forwards command message to destination
+        // TODO: Forwards service message to destination
         this.relay(channel, msg, sender, msg.dest);
     }
 
-    protected onReceiveCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandResponseMessage>, sender: Socket): void {
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender: Socket): void {
         // TODO: Skip if server not a recipient
-        super.onReceiveCommandResponseMessage(channel, msg, sender);
-        // TODO: Forwards command response to destination
+        super.onReceiveServiceResponseMessage(channel, msg, sender);
+        // TODO: Forwards service response to destination
         this.relay(channel, msg, sender, [msg.dest]);
     }
 }

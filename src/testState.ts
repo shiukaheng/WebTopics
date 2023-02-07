@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { TopicServer } from "./Server";
 import { TopicClient } from "./Client";
 import { TopicChannel } from "./utils/Channel";
-import { createCommandChannel, createTopicChannel } from "./utils/createChannel";
+import { createServiceChannel, createTopicChannel } from "./utils/createChannel";
 
 const topicChannel = createTopicChannel("test",
     z.object({

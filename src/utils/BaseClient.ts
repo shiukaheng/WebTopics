@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { Channel, CommandChannel, TopicChannel } from "./Channel";
+import { Channel, ServiceChannel, TopicChannel } from "./Channel";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
-import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, CommandMessage, commandMessageSchema, CommandResponseMessage, commandResponseMessageSchema } from "../messages/Messages";
+import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "../messages/Messages";
 import { JSONObject, JSONValue } from "./JSON";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,14 +17,14 @@ export type OnReceiveRequestFullTopicMessageArgs<V = void> = {
     message: WithMeta<RequestFullTopicMessage>, alreadyHasFullTopic: boolean
 }
 
-export type OnReceiveCommandMessageArgs<V = void> = {
+export type OnReceiveServiceMessageArgs<V = void> = {
     socket?: V;
-    message: WithMeta<CommandMessage>, valid: boolean
+    message: WithMeta<ServiceMessage>, valid: boolean
 }
 
-export type OnReceiveCommandResponseMessageArgs<V = void> = {
+export type OnReceiveServiceResponseMessageArgs<V = void> = {
     socket?: V;
-    message: WithMeta<CommandMessage>, valid: boolean
+    message: WithMeta<ServiceMessage>, valid: boolean
 }
 
 export type DestType = string[] | "*";
@@ -35,10 +35,10 @@ export abstract class BaseClient<V = void> {
     protected topicHandlerMap: Map<string, ((value: JSONValue) => void)[]> = new Map();
     protected topicMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected topicsValid: Map<string, boolean> = new Map();
-    protected commandHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
+    protected serviceHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
     protected id: string;
-    protected commandResolvers: Map<string, (data: JSONValue) => void> = new Map();
-    protected commandRejectors: Map<string, (reason: any) => void> = new Map();
+    protected serviceResolvers: Map<string, (data: JSONValue) => void> = new Map();
+    protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
 
     /**
      * Whether the client subscribes get called from its own publishes
@@ -95,19 +95,19 @@ export abstract class BaseClient<V = void> {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullTopic", source), "*");
     }
 
-    sendNoCommandHandlerMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, id: string, dest: string) {
+    sendNoServiceHandlerMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, id: string, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
-            commandId: id,
+            serviceId: id,
             dest,
-            noCommandHandler: true
-        }, "commandResponse"), [dest]);
+            noServiceHandler: true
+        }, "serviceResponse"), [dest]);
     }
-    sendCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, id: string, result: JSONValue, dest: string) {
+    sendServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, id: string, result: JSONValue, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             responseData: result,
-            commandId: id,
+            serviceId: id,
             dest
-        }, "commandResponse"), [dest]);
+        }, "serviceResponse"), [dest]);
     }
 
     sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T) => void): void {
@@ -144,19 +144,19 @@ export abstract class BaseClient<V = void> {
         }
     }
 
-    serve<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, handler?: (topic: T) => U): void {
-        if (channel.mode !== "command") throw new Error("Channel is not a command channel");
+    serve<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, handler?: (topic: T) => U): void {
+        if (channel.mode !== "service") throw new Error("Channel is not a service channel");
         // Initialize channel
         const eventName = this.getChannelName(channel);
         const channelType = channel.mode;
-        this.listenCommandChannel(channel);
+        this.listenServiceChannel(channel);
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
-            this.commandHandlerMap.set(eventName, handler as (command: JSONValue) => U);
+            this.serviceHandlerMap.set(eventName, handler as (service: JSONValue) => U);
         }
     }
 
-    private listenCommandChannel<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>) {
+    private listenServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.channelSchemaMap.set(eventName, channel.schema);
@@ -169,53 +169,53 @@ export abstract class BaseClient<V = void> {
                     return;
                 }
                 metaMessageSchema.parse(msg);
-                if (msg.messageType === "commandResponse" && commandResponseMessageSchema.safeParse(msg).success) {
-                    this.onReceiveCommandResponseMessage<T, U>(channel, msg as WithMeta<CommandResponseMessage>, sender);
+                if (msg.messageType === "serviceResponse" && serviceResponseMessageSchema.safeParse(msg).success) {
+                    this.onReceiveServiceResponseMessage<T, U>(channel, msg as WithMeta<ServiceResponseMessage>, sender);
                     return;
                 }
-                if (msg.messageType === "command" && commandMessageSchema.safeParse(msg).success) {
-                    this.onReceiveCommandMessage<T, U>(channel, msg as WithMeta<CommandMessage>, sender);
+                if (msg.messageType === "service" && serviceMessageSchema.safeParse(msg).success) {
+                    this.onReceiveServiceMessage<T, U>(channel, msg as WithMeta<ServiceMessage>, sender);
                     return;
                 }
-                console.warn(`Invalid message received for command channel ${channel.name}:`, msg);
+                console.warn(`Invalid message received for service channel ${channel.name}:`, msg);
             });
         }
     }
 
     /**
-     * Handle response - resolve the promise for the command
+     * Handle response - resolve the promise for the service
      * Common: If the message is for them, they should resolve the promise
      * Server: If the message is for another client, they should forward the message to that client
      */
-    protected onReceiveCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandResponseMessage>, sender: V) {
-        const resolver = this.commandResolvers.get(msg.commandId);
-        const rejector = this.commandRejectors.get(msg.commandId);
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender: V) {
+        const resolver = this.serviceResolvers.get(msg.serviceId);
+        const rejector = this.serviceRejectors.get(msg.serviceId);
         if (resolver === undefined || rejector === undefined) {
-            console.warn("No resolver or rejector for command id: ", msg.commandId, ", perhaps the command timed out?");
+            console.warn("No resolver or rejector for service id: ", msg.serviceId, ", perhaps the service timed out?");
             return;
         }
         if (msg.noHandler) {
-            rejector(new Error("No command handler"));
+            rejector(new Error("No service handler"));
         } else {
-            // console.log("Resolving command promise");
+            // console.log("Resolving service promise");
             resolver(msg.responseData as U);
         }
     }
 
-    protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: V) {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender: V) {
         // Get the handler
-        // console.log("Received command message: ", msg);
+        // console.log("Received service message: ", msg);
         const eventName = this.getChannelName(channel);
-        const handler = this.commandHandlerMap.get(eventName);
+        const handler = this.serviceHandlerMap.get(eventName);
         if (handler === undefined) {
             console.warn(`No handler for channel ${channel.name}`);
             // Dest is now the source, source is now the dest (object's id, which is that be default anyway)
-            this.sendNoCommandHandlerMessage(channel, msg.commandId, msg.source);
+            this.sendNoServiceHandlerMessage(channel, msg.serviceId, msg.source);
         } else {
             // Run the handler
-            const result = handler(msg.commandData as JSONValue);
+            const result = handler(msg.serviceData as JSONValue);
             // Send the result
-            this.sendCommandResponseMessage(channel, msg.commandId, result, msg.source);
+            this.sendServiceResponseMessage(channel, msg.serviceId, result, msg.source);
         }
     }
 
@@ -293,52 +293,52 @@ export abstract class BaseClient<V = void> {
         this._set(channel, topic, false, source);
     }
 
-    req<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, commandData: T, dest: DestType, timeout: number=10000): Promise<U> {
+    req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, timeout: number=10000): Promise<U> {
         // console.log(Date.now())
-        this.listenCommandChannel(channel);
-        if (channel.mode !== "command") {
-            throw new Error("Channel is not a command channel");
+        this.listenServiceChannel(channel);
+        if (channel.mode !== "service") {
+            throw new Error("Channel is not a service channel");
         }
-        // See if command is valid
-        const valid = channel.schema.safeParse(commandData).success;
+        // See if service is valid
+        const valid = channel.schema.safeParse(serviceData).success;
         if (!valid) {
-            throw new Error("Command data is not valid");
+            throw new Error("Service data is not valid");
         }
-        // Send the command
-        const id = this.sendCommandMessage(channel, commandData, dest);
+        // Send the service
+        const id = this.sendServiceMessage(channel, serviceData, dest);
         // Create a promise that resolves when the response is received
         return new Promise((resolve, reject) => {
             // Set a timeout
             const timeoutId = setTimeout(() => {
-                reject(new Error("Command timed out"));
+                reject(new Error("Service timed out"));
             }, timeout);
             // Add the promise to the map
-            this.commandResolvers.set(id, (result: JSONValue) => {
+            this.serviceResolvers.set(id, (result: JSONValue) => {
                 clearTimeout(timeoutId);
-                this.commandResolvers.delete(id);
-                this.commandRejectors.delete(id);
+                this.serviceResolvers.delete(id);
+                this.serviceRejectors.delete(id);
                 resolve(result as U);
             })
-            this.commandRejectors.set(id, (reason: any) => {
+            this.serviceRejectors.set(id, (reason: any) => {
                 clearTimeout(timeoutId);
-                this.commandResolvers.delete(id);
-                this.commandRejectors.delete(id);
+                this.serviceResolvers.delete(id);
+                this.serviceRejectors.delete(id);
                 reject(reason);
             })
         });
     }
 
-    sendCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, commandData: T, dest: DestType): string {
-        if (channel.mode !== "command") {
-            throw new Error("Channel is not a command channel");
+    sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType): string {
+        if (channel.mode !== "service") {
+            throw new Error("Channel is not a service channel");
         }
         const id = uuidv4();
-        const msg: CommandMessage = {
-            commandData,
-            commandId: id,
+        const msg: ServiceMessage = {
+            serviceData,
+            serviceId: id,
             dest,
         }
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(msg as JSONObject, "command"), dest);
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(msg as JSONObject, "service"), dest);
         return id;
     }
 

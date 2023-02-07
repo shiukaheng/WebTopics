@@ -2,10 +2,10 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import { TopicServer } from "./Server";
 import { TopicClient } from "./Client";
-import { CommandChannel, TopicChannel } from "./utils/Channel";
-import { createCommandChannel } from "./utils/createChannel";
+import { ServiceChannel, TopicChannel } from "./utils/Channel";
+import { createServiceChannel } from "./utils/createChannel";
 
-const testChannel = createCommandChannel("test",
+const testChannel = createServiceChannel("test",
     z.object({
         a: z.number(),
         b: z.number()
