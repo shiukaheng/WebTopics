@@ -2,8 +2,8 @@
 
 Real-time topics and services for web apps using Socket.io and Zod inspired by ROS.
 Meant for use in low-latency interactive applications on local networks.
-### Features
-- Typed and validated topics and services via Zod
+## Features
+### Typed and validated topics and services via Zod
   ```typescript
   const SensorTopic = createTopic("sensor", z.object({
     "temperature": z.number(),
@@ -11,7 +11,7 @@ Meant for use in low-latency interactive applications on local networks.
   }))
   client.pub(SensorTopic, {temperature: 20, humidity: "50%"}) // Error: Expected number, received string
   ```
-- Collaborative topics
+### Collaborative topics
   ```typescript
   client1.pub(channel, {a: "1"})
   client2.pub(channel, {b: "2"})
@@ -19,7 +19,7 @@ Meant for use in low-latency interactive applications on local networks.
     console.log(value) // {a: "1", b: "2"}
   })
   ```
-- Async service calls
+### Async service calls
   ```typescript
   const AdditionService = createService("add", 
     // Request schema
@@ -35,7 +35,7 @@ Meant for use in low-latency interactive applications on local networks.
   // Call service
   const result = await client.req(AdditionService, {a: 1, b: 2}, someClientID) // Promise<number>
   ```
-- Packagable channels for easy sharing between client and server
+### Packagable channels for easy sharing between client and server
   ```typescript
   export const AdditionService = createService("add", 
     z.object({
