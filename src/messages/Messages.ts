@@ -36,17 +36,18 @@ export const jsonValueSchema = z.union([
     z.string(),
     z.number(),
     z.boolean(),
-    z.object({}),
+    z.object({}).passthrough(),
     z.null(),
     z.array(z.unknown()),
+    z.record(z.unknown()),
 ]);
 
 /**
  * Message containing the partial state
  */
 export const stateMessageSchema = z.object({
-    modified: jsonValueSchema,
-    deleted: jsonValueSchema
+    modified: jsonValueSchema.optional(),
+    deleted: jsonValueSchema.optional()
 });
 export type StateMessage = z.infer<typeof stateMessageSchema>;
 

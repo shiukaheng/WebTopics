@@ -135,11 +135,13 @@ export abstract class BaseStateClient<V = void> {
                 metaMessageSchema.parse(msg);
                 if (msg.messageType === "requestFullState" && requestFullStateMessageSchema.safeParse(msg).success) {
                     this.onReceiveRequestFullStateMessage<T>(channel, msg as WithMeta<RequestFullStateMessage>, sender);
+                    return;
                 } 
                 if (msg.messageType === "state" && stateMessageSchema.safeParse(msg).success) {
                     this.onReceiveStateMessage<T>(channel, msg as WithMeta<StateMessage>, sender);
+                    return;
                 }
-                console.warn("Unrecognized message type for message: ", msg);
+                console.warn("Unrecognized message type for message: ", msg, stateMessageSchema.parse(msg));
             });
         }
         this.channelSchemaMap.set(eventName, channel.schema);
@@ -183,38 +185,33 @@ export abstract class BaseStateClient<V = void> {
      * Common: If the message is for them, they should resolve the promise
      * Server: If the message is for another client, they should forward the message to that client
      */
-    protected onReceiveCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: any, sender: V) {
-        // Cast the message to the correct type
-        const message = msg as WithMeta<CommandResponseMessage>;
-        const resolver = this.commandResolvers.get(message.commandId);
-        const rejector = this.commandRejectors.get(message.commandId);
+    protected onReceiveCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandResponseMessage>, sender: V) {
+        const resolver = this.commandResolvers.get(msg.commandId);
+        const rejector = this.commandRejectors.get(msg.commandId);
         if (resolver === undefined || rejector === undefined) {
-            console.warn("No resolver or rejector for command id: ", message.commandId, ", perhaps the command timed out?");
+            console.warn("No resolver or rejector for command id: ", msg.commandId, ", perhaps the command timed out?");
             return;
         }
-        if (message.noHandler) {
+        if (msg.noHandler) {
             rejector(new Error("No command handler"));
         } else {
-            resolver(message.responseData as U);
+            resolver(msg.responseData as U);
         }
     }
 
     protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: V) {
-        // Check if the message is for us
-        if (msg.dest === "*" || msg.dest.includes(this.id)) {
-            // Get the handler
-            const eventName = this.getChannelName(channel);
-            const handler = this.commandHandlerMap.get(eventName);
-            if (handler === undefined) {
-                console.warn(`No handler for channel ${channel.name}`);
-                // Dest is now the source, source is now the dest (object's id, which is that be default anyway)
-                this.sendNoCommandHandlerMessage(channel, msg.commandId, msg.source);
-            } else {
-                // Run the handler
-                const result = handler(msg.commandData as JSONValue);
-                // Send the result
-                this.sendCommandResponseMessage(channel, msg.commandId, result, msg.source);
-            }
+        // Get the handler
+        const eventName = this.getChannelName(channel);
+        const handler = this.commandHandlerMap.get(eventName);
+        if (handler === undefined) {
+            console.warn(`No handler for channel ${channel.name}`);
+            // Dest is now the source, source is now the dest (object's id, which is that be default anyway)
+            this.sendNoCommandHandlerMessage(channel, msg.commandId, msg.source);
+        } else {
+            // Run the handler
+            const result = handler(msg.commandData as JSONValue);
+            // Send the result
+            this.sendCommandResponseMessage(channel, msg.commandId, result, msg.source);
         }
     }
 

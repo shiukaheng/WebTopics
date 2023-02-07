@@ -1,8 +1,10 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of state sharing server
 
 import { Server, Socket } from "socket.io";
-import { BaseStateClient, channelPrefix} from "./utils/BaseStateClient";
-import { Channel } from "./utils/Channel";
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
+import { WithMeta, StateMessage, RequestFullStateMessage, CommandMessage, MessageMeta, CommandResponseMessage } from "./messages/Messages";
+import { BaseStateClient, channelPrefix, DestType} from "./utils/BaseStateClient";
+import { Channel, CommandChannel, StateChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
 
@@ -64,29 +66,59 @@ export class StateServer extends BaseStateClient<Socket> {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    private relayStateMessage<T extends JSONValue>(channel: Channel<T>, diffResult: DiffResult<T, T>, sender: Socket): void {
-        sender.broadcast.emit(this.getChannelName(channel), this.wrapMessage(diffResult as JSONObject, "state"));
-    }
-    sub<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.sub(channel, 
-            // Handle state changes
-            handler, 
-            // Handle on receive state message
-            (event) => {
-                // Forwards state message to all clients except sender
-                if (event.socket) {
-                    // TODO:
-                    // Check if the source is genuine
-                    // Relay message with respect to destinations specified in message
-                    this.relayStateMessage(channel, event.diffResult, event.socket);
+    protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: Socket, dest: DestType = "*"): void {
+        if (dest === "*") {
+            // Broadcast to all sockets
+            senderSocket.broadcast.emit(this.getChannelName(channel), msg);
+        } else {
+            // Find all sockets required
+            let sockets: Socket[] = [];
+            for (const clientID of dest) {
+                const socketID = this.clientToSocketID.get(clientID);
+                if (socketID) {
+                    const socket = this.clientSockets.get(socketID);
+                    if (socket) {
+                        sockets.push(socket);
+                    } else {
+                        throw new Error(`Client ${clientID} has socket ID ${socketID} but socket not found`);
+                    }
                 } else {
-                    throw new Error("No sender for state message?");
+                    console.warn(`Client ${clientID} not connected, skipping message`);
                 }
-            },
-            // Handle on receive request full state message
-            (event) => {
-                // Already dealt with in BaseStateClient to send full state when requested
             }
-        );
+            // Send message to all sockets
+            for (const socket of sockets) {
+                socket.emit(this.getChannelName(channel), msg);
+            }
+        }
+    }
+
+    protected onReceiveStateMessage<T extends JSONValue>(channel: StateChannel<T>, msg: WithMeta<StateMessage>, sender: Socket): void {
+        super.onReceiveStateMessage(channel, msg, sender);
+        // TODO: Forwards state message to all clients except sender
+        sender.broadcast.emit(this.getChannelName(channel), msg);
+    }
+
+    // Server should always know the full state, so this is not needed:
+    // protected onReceiveRequestFullStateMessage<T extends JSONValue>(channel: StateChannel<T>, msg: WithMeta<RequestFullStateMessage>, sender: Socket): void {
+    //     super.onReceiveRequestFullStateMessage(channel, msg, sender);
+    //     // TODO: Forwards request full state message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
+    //     // Alternatively: Broadcast to all clients to request full state, and only after all clients have responded, send complete state as one message
+    // };
+
+    protected onReceiveCommandMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandMessage>, sender: Socket): void {
+        // TODO: Skip if server not a recipient
+        if (msg.dest === "*" || msg.dest.includes(this.id)) {
+            super.onReceiveCommandMessage(channel, msg, sender);
+        }
+        // TODO: Forwards command message to destination
+        this.relay(channel, msg, sender, msg.dest);
+    }
+
+    protected onReceiveCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, msg: WithMeta<CommandResponseMessage>, sender: Socket): void {
+        // TODO: Skip if server not a recipient
+        super.onReceiveCommandResponseMessage(channel, msg, sender);
+        // TODO: Forwards command response to destination
+        this.relay(channel, msg, sender, [msg.dest]);
     }
 }

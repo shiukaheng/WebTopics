@@ -2,7 +2,7 @@
 
 import { io, Socket } from "socket.io-client";
 import { BaseStateClient} from "./utils/BaseStateClient";
-import { Channel } from "./utils/Channel";
+import { Channel, StateChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
 
@@ -24,10 +24,10 @@ export class StateClient extends BaseStateClient {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    serve<T extends JSONValue>(channel: Channel<T>, handler?: ((state: T) => void) | undefined): void {
-        super.serve(channel, 
-            // Handle state changes
-            handler
-        );
-    }
+    // sub<T extends JSONValue>(channel: StateChannel<T>, handler?: ((state: T) => void) | undefined): void {
+    //     super.sub(channel, 
+    //         // Handle state changes
+    //         handler
+    //     );
+    // }
 }

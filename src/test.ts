@@ -2,27 +2,29 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import { StateServer } from "./Server";
 import { StateClient } from "./Client";
+import { StateChannel } from "./utils/Channel";
 
 const testSchema = z.object({
     a: z.string(),
     b: z.number()
 });
 
-const testChannel = {
+const testChannel: StateChannel<z.infer<typeof testSchema>> = {
+    mode: "state",
     name: "test",
-    schema: testSchema
+    schema: testSchema,
 }
 
 const socketIOServer = new Server(3000);
 const stateServer = new StateServer(socketIOServer);
 
-stateServer.serve(testChannel, (state) => {
+stateServer.sub(testChannel, (state) => {
     console.log(`Server received state: ${JSON.stringify(state)}`)
 });
 
 // Client 1
 const stateClient1 = new StateClient("http://localhost:3000");
-stateClient1.serve(testChannel, (state) => {
+stateClient1.sub(testChannel, (state) => {
     console.log(`Client 1 received state: ${JSON.stringify(state)}`)
 });
 
