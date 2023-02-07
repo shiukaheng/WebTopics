@@ -53,7 +53,7 @@ export abstract class BaseStateClient<V = void> {
 
     // Abstract methods
     protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
-    protected abstract emitRawEvent(event: string, data: any): void;
+    protected abstract emitRawEvent(event: string, data: any, destination: DestType): void;
 
     // Default constructor
 	constructor(selfSubscribed: boolean = true) {
@@ -76,7 +76,7 @@ export abstract class BaseStateClient<V = void> {
     }
 
     protected sendStateMessage<T extends JSONValue>(channel: StateChannel<T>, diff: DiffResult<T, T>, source?: string): void {
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state", source));
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "state", source), "*");
     }
 
     sendDiffState<T extends JSONValue>(channel: StateChannel<T>, diffResult: DiffResult<T, T>, source?: string): void {
@@ -98,7 +98,7 @@ export abstract class BaseStateClient<V = void> {
     }
 
     sendRequestFullState<T extends JSONValue>(channel: StateChannel<T>, source?: string): void {
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState", source));
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullState", source), "*");
     }
 
     sendNoCommandHandlerMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, id: string, dest: string) {
@@ -106,14 +106,14 @@ export abstract class BaseStateClient<V = void> {
             commandId: id,
             dest,
             noCommandHandler: true
-        }, "commandResponse"));
+        }, "commandResponse"), [dest]);
     }
     sendCommandResponseMessage<T extends JSONValue, U extends JSONValue>(channel: CommandChannel<T, U>, id: string, result: JSONValue, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             responseData: result,
             commandId: id,
             dest
-        }, "commandResponse"));
+        }, "commandResponse"), [dest]);
     }
 
     sub<T extends JSONValue>(channel: StateChannel<T>, handler?: (state: T) => void): void {
@@ -344,7 +344,7 @@ export abstract class BaseStateClient<V = void> {
             commandId: id,
             dest,
         }
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(msg as JSONObject, "command"));
+        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(msg as JSONObject, "command"), dest);
         return id;
     }
 

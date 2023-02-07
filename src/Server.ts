@@ -57,18 +57,49 @@ export class StateServer extends BaseStateClient<Socket> {
                 console.warn(`Client ${data} already connected, disconnecting`);
                 return;
             }
-            this.clientToSocketID.set(sender.id, data);
-            this.socketToClientID.set(data, sender.id);
+            this.clientToSocketID.set(data, sender.id);
+            this.socketToClientID.set(sender.id, data);
             console.log(`Client ${data} connected: ${sender.id}`)
         });
+        console.log("Server started: " + this.id);
     }
     // General listener for event on all clients
     protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {
         this.channelHandlers.set(event, listener);
     }
-    protected emitRawEvent(event: string, data: any): void {
-        this.socket.emit(event, data);
+    protected emitRawEvent(event: string, data: any, dest: DestType): void {
+        if (dest === "*") {
+            // Broadcast to all sockets
+            this.socket.emit(event, data);
+        } else {
+            // Find all sockets required
+            let sockets: Socket[] = this.getSockets(dest);
+            // Send message to all sockets
+            for (const socket of sockets) {
+                socket.emit(event, data);
+            }
+        }
     }
+    private getSockets(dest: string[]) {
+        let sockets: Socket[] = [];
+        for (const clientID of dest) {
+            const socketID = this.clientToSocketID.get(clientID);
+            if (socketID) {
+                const socket = this.clientSockets.get(socketID);
+                if (socket) {
+                    sockets.push(socket);
+                } else {
+                    throw new Error(`Client ${clientID} has socket ID ${socketID} but socket not found`);
+                }
+            } else if (clientID === this.id) {
+                // Ignore server
+            } else {
+                console.warn(`Client ${clientID} not found`);
+            }
+        }
+        return sockets;
+    }
+
     protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: Socket, dest: DestType = "*"): void {
         if (dest === "*") {
             // Broadcast to all sockets
