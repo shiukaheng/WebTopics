@@ -54,3 +54,7 @@ Meant for use in low-latency interactive applications on local networks.
   // Client and server can share the same channels from an external package
   import {AdditionService, SensorTopic} from "channels"
   ```
+
+# To do
+- [ ] Different namespaces for topics and services
+- [ ] Client listing (via topic)
