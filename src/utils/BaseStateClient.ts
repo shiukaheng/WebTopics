@@ -27,7 +27,7 @@ export abstract class BaseStateClient<V = void> {
     protected channelHandlersMap: Map<string, ((state: JSONValue) => void)[]> = new Map();
     protected stateMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected statesValid: Map<string, boolean> = new Map();
-    // protected id: string; // Unused for now
+    protected id: string; // Unused for now
 
     /**
      * Whether the client subscribes get called from its own publishes
@@ -42,7 +42,7 @@ export abstract class BaseStateClient<V = void> {
     // Default constructor
 	constructor(selfSubscribed: boolean = true) {
         this.selfSubscribed = selfSubscribed;
-        // this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 	}
 
     // Helper / convenience methods
@@ -156,7 +156,7 @@ export abstract class BaseStateClient<V = void> {
         }
         // Add handler
         if (onStateChange !== undefined) {
-            this.channelHandlersMap.get(eventName)?.push(onStateChange);
+            this.channelHandlersMap.get(eventName)?.push(onStateChange as (state: JSONValue) => void);
         }
     }
 
@@ -165,7 +165,7 @@ export abstract class BaseStateClient<V = void> {
         if (onStateChange !== undefined) {
             const handlers = this.channelHandlersMap.get(eventName);
             if (handlers !== undefined) {
-                const index = handlers.indexOf(onStateChange);
+                const index = handlers.indexOf(onStateChange as (state: JSONValue) => void);
                 if (index !== -1) {
                     handlers.splice(index, 1);
                 }

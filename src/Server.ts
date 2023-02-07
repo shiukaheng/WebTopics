@@ -13,6 +13,8 @@ export class StateServer extends BaseStateClient<Socket> {
     private clientSockets: Map<string, Socket>;
     private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
     private socket: Server;
+    private socketToClientID: Map<string, string> = new Map();
+    private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
     constructor(server: Server, selfSubscribed: boolean = true) {
         super(selfSubscribed);
         this.socket = server;
@@ -32,7 +34,28 @@ export class StateServer extends BaseStateClient<Socket> {
             socket.on("disconnect", () => {
                 console.log("Client disconnected: " + socket.id);
                 this.clientSockets.delete(socket.id);
+                const clientID = this.socketToClientID.get(socket.id);
+                if (clientID !== undefined) {
+                    this.clientToSocketID.delete(clientID);
+                    this.socketToClientID.delete(socket.id);
+                }
             });
+        });
+        this.onRawEvent("id", (data: any, sender: Socket) => {
+            // Check if client ID is already in use
+            if (this.clientToSocketID.has(data)) {
+                // Disconnect old client
+                const oldSocketID = this.clientToSocketID.get(data);
+                if (oldSocketID !== undefined) {
+                    const oldSocket = this.clientSockets.get(oldSocketID);
+                    if (oldSocket !== undefined) {
+                        oldSocket.disconnect();
+                        console.warn("Client ID already in use, disconnecting old client");
+                    }
+                }
+            }
+            this.clientToSocketID.set(sender.id, data);
+            this.socketToClientID.set(data, sender.id);
         });
     }
     // General listener for event on all clients
