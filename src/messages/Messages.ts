@@ -44,4 +44,3 @@ export const stateMessageSchema = z.object({
 export type StateMessage = z.infer<typeof stateMessageSchema>;
 
 export type WithMeta<T> = T & MessageMeta;
-export type Message<T> = {data: T} & MessageMeta
