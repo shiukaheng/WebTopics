@@ -2,9 +2,6 @@
 
 import { io, Socket } from "socket.io-client";
 import { BaseClient} from "./utils/BaseClient";
-import { Channel, TopicChannel } from "./utils/Channel";
-import { DiffResult } from "./utils/Compare";
-import { JSONObject, JSONValue } from "./utils/JSON";
 
 // Adapt for server types
 // Make server mirror client messages so they get broadcasted to all clients
@@ -28,10 +25,4 @@ export class TopicClient extends BaseClient {
     protected emitRawEvent(event: string, data: any): void {
         this.socket.emit(event, data);
     }
-    // sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: ((topic: T) => void) | undefined): void {
-    //     super.sub(channel, 
-    //         // Handle topic changes
-    //         handler
-    //     );
-    // }
 }

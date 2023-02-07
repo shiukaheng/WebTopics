@@ -144,7 +144,7 @@ export abstract class BaseClient<V = void> {
         }
     }
 
-    serve<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, handler?: (topic: T) => U): void {
+    srv<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, handler?: (topic: T) => U): void {
         if (channel.mode !== "service") throw new Error("Channel is not a service channel");
         // Initialize channel
         const eventName = this.getChannelName(channel);
@@ -293,7 +293,8 @@ export abstract class BaseClient<V = void> {
         this._set(channel, topic, false, source);
     }
 
-    req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, timeout: number=10000): Promise<U> {
+    // req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, timeout: number=10000): Promise<U> { // TODO: Support multiple destinations
+    req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number=10000): Promise<U> {
         // console.log(Date.now())
         this.listenServiceChannel(channel);
         if (channel.mode !== "service") {
@@ -305,7 +306,7 @@ export abstract class BaseClient<V = void> {
             throw new Error("Service data is not valid");
         }
         // Send the service
-        const id = this.sendServiceMessage(channel, serviceData, dest);
+        const id = this.sendServiceMessage(channel, serviceData, [dest]);
         // Create a promise that resolves when the response is received
         return new Promise((resolve, reject) => {
             // Set a timeout
@@ -328,7 +329,7 @@ export abstract class BaseClient<V = void> {
         });
     }
 
-    sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType): string {
+    protected sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType): string {
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
         }

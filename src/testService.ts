@@ -16,7 +16,7 @@ const testChannel = createChannel("test",
 
 const socketIOServer = new Server(3000);
 const topicServer = new TopicServer(socketIOServer);
-topicServer.serve(testChannel, ({a, b}) => {
+topicServer.srv(testChannel, ({a, b}) => {
     return {
         c: a + b
     }
@@ -30,18 +30,18 @@ const topicClient2 = new TopicClient("http://localhost:3000");
 
 // Send updates regularly from client 1
 setInterval(() => {
-    topicClient1.req(testChannel, {a: 1, b: 2}, [topicClient1.serverID as string]).then((response) => {
+    topicClient1.req(testChannel, {a: 1, b: 2}, topicClient1.serverID as string).then((response) => {
         console.log(`Client 1 received response: ${JSON.stringify(response)}`)
     }).catch((error) => {
-        // console.log(`Client 1 received error: ${error}`)
+        console.log(`Client 1 received error: ${error}`)
     });    
 }, 1000);
 
 // Send updates regularly from client 1
 setInterval(() => {
-    topicClient2.req(testChannel, {a: 2, b: 3}, [topicClient1.serverID as string]).then((response) => {
+    topicClient2.req(testChannel, {a: 2, b: 3}, topicClient1.serverID as string).then((response) => {
         console.log(`Client 2 received response: ${JSON.stringify(response)}`)
     }).catch((error) => {
-        // console.log(`Client 2 received error: ${error}`)
+        console.log(`Client 2 received error: ${error}`)
     });    
 }, 1500);
