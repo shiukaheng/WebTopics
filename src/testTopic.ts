@@ -2,8 +2,7 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import { TopicServer } from "./Server";
 import { TopicClient } from "./Client";
-import { TopicChannel } from "./utils/Channel";
-import { createChannel, createTopic } from "./utils/createChannel";
+import { createTopic } from "./utils/createChannel";
 
 const topicChannel = createTopic("test",
     z.object({

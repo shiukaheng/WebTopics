@@ -2,7 +2,6 @@ import { z } from "zod";
 import { Server } from "socket.io";
 import { TopicServer } from "./Server";
 import { TopicClient } from "./Client";
-import { ServiceChannel, TopicChannel } from "./utils/Channel";
 import { createChannel } from "./utils/createChannel";
 
 const testChannel = createChannel("test",
