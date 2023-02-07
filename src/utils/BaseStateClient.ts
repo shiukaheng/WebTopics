@@ -5,12 +5,6 @@ import { metaMessageSchema, MessageMeta, RequestFullStateMessage, stateMessageSc
 import { JSONObject, JSONValue } from "./JSON";
 import { v4 as uuidv4 } from 'uuid';
 
-// TODO: Can add deletion feature. We need to intelligently merge the state on the server to make sure there are no delete conflicts
-// Then, we can send the diff to all the clients
-// We need a seperate message type called "set" though, and this will remove all hope of decentralization unfortunately
-// But it will be hard to decentralize if we need to do it through the internet anyway so it's not that bad!
-// Just changes the application of the library
-
 export const channelPrefix = "ch-";
 
 export type OnReceiveStateMessageArgs<T extends JSONValue, V = void> = {
@@ -58,7 +52,7 @@ export abstract class BaseStateClient<V = void> {
     // Default constructor
 	constructor(selfSubscribed: boolean = true) {
         this.selfSubscribed = selfSubscribed;
-        this.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        this.id = uuidv4();
 	}
 
     // Helper / convenience methods
