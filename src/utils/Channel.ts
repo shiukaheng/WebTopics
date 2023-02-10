@@ -12,12 +12,14 @@ export type Channel<T extends JSONValue> = {
     name: string;
     mode: ChannelMode;
     schema: z.ZodSchema<T>;
+    meta?: boolean;
 }
 
 export const channelSchema = z.object({
     name: z.string(),
     mode: channelModeSchema,
     schema: z.unknown(),
+    meta: z.boolean().optional(),
 });
 
 export type ServiceChannel<T extends JSONValue, U extends JSONValue> = Channel<T> & {

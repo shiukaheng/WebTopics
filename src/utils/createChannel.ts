@@ -18,3 +18,10 @@ export function createChannel<T extends JSONValue, R extends JSONValue>(name: st
         responseSchema
     }
 }
+
+export function makeChannelMeta<T>(channel: T): T & { meta: true } {
+    return {
+        ...channel,
+        meta: true
+    };
+}

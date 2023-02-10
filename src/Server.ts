@@ -3,6 +3,7 @@
 import { Server, Socket } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { WithMeta, TopicMessage, RequestFullTopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
+import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType} from "./utils/BaseClient";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
@@ -20,12 +21,18 @@ export class TopicServer extends BaseClient<Socket> {
     private socket: Server;
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
+    private clientMeta: ServerMeta = {
+        serverID: "server",
+        clients: {}
+    };
     static metaChannels = ["id"]; // Extra channels the server handles with onRawEvent
-    constructor(server: Server, selfSubscribed: boolean = true) {
-        super(selfSubscribed);
+    constructor(server: Server) {
+        super();
+        this.id = "server"
         this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
+        this.initialize();
         this.socket.on("connection", (socket) => {
             this.clientSockets.set(socket.id, socket);
             // Add handlers for all events listed in handlers
@@ -38,16 +45,22 @@ export class TopicServer extends BaseClient<Socket> {
                 }
             });
             socket.on("disconnect", () => {
-                console.log("Client disconnected: " + socket.id);
+                console.log("❌ Client disconnected: " + socket.id);
                 this.clientSockets.delete(socket.id);
                 const clientID = this.socketToClientID.get(socket.id);
                 if (clientID !== undefined) {
                     this.clientToSocketID.delete(clientID);
                     this.socketToClientID.delete(socket.id);
+                    // Remove client from server meta
+                    delete this.clientMeta.clients[clientID as string];
+                    super.pub(serverMetaChannel, this.clientMeta);
+                } else {
+                    console.warn("Client disconnected, but no matching client ID found");
                 }
             });
             // Send server ID to client
             socket.emit("id", this.id);
+            // Add client to server meta
         });
         this.onRawEvent("id", (data: any, sender: Socket) => {
             // Check if client ID is already in use
@@ -59,9 +72,15 @@ export class TopicServer extends BaseClient<Socket> {
             }
             this.clientToSocketID.set(data, sender.id);
             this.socketToClientID.set(sender.id, data);
-            console.log(`Client ${data} connected: ${sender.id}`)
+            console.log(`✅ Client ${data} connected to server`);
         });
-        console.log("Server started: " + this.id);
+    }
+    protected initialize(): void {
+        super.initialize();
+        this.sub(serverMetaChannel, (data: ServerMeta) => {
+            this.clientMeta = data;
+        });
+        super.pub(serverMetaChannel, this.clientMeta, true, false);
     }
     // General listener for event on all clients
     protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {
@@ -129,10 +148,12 @@ export class TopicServer extends BaseClient<Socket> {
         }
     }
 
-    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender: Socket): void {
+    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender?: Socket): void {
         super.onReceiveTopicMessage(channel, msg, sender);
         // TODO: Forwards topic message to all clients except sender
-        sender.broadcast.emit(this.getChannelName(channel), msg);
+        if (sender !== undefined) { // When sender is undefined, it is the server itself
+            sender.broadcast.emit(this.getChannelName(channel), msg);
+        }
     }
 
     // Server should always know the full topic, so this is not needed:

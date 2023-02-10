@@ -9,9 +9,10 @@ import { BaseClient} from "./utils/BaseClient";
 export class TopicClient extends BaseClient {
     private socket: Socket;
     public serverID: string | undefined;
-    constructor(serverURL: string, selfSubscribed: boolean = true) {
-        super(selfSubscribed);
+    constructor(serverURL: string) {
+        super();
         this.socket = io(serverURL);
+        this.initialize();
         this.socket.on("connect", () => {
             this.socket.emit("id", this.id);
         });

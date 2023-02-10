@@ -4,8 +4,14 @@ import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
 import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "../messages/Messages";
 import { JSONObject, JSONValue } from "./JSON";
 import { v4 as uuidv4 } from 'uuid';
+import { serverMetaChannel } from "../metaChannels";
+import { cloneDeep } from "lodash";
 
 export const channelPrefix = "ch-";
+export const servicePrefix = "sv-";
+export const topicPrefix = "tp-";
+export const userPrefix = "us-";
+export const metaPrefix = "mt-";
 
 export type OnReceiveTopicMessageArgs<T extends JSONValue, V = void> = {
     socket?: V;
@@ -40,24 +46,42 @@ export abstract class BaseClient<V = void> {
     protected serviceResolvers: Map<string, (data: JSONValue) => void> = new Map();
     protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
 
-    /**
-     * Whether the client subscribes get called from its own publishes
-     */
-    selfSubscribed: boolean;
-
     // Abstract methods
     protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
     protected abstract emitRawEvent(event: string, data: any, destination: DestType): void;
 
     // Default constructor
-	constructor(selfSubscribed: boolean = true) {
-        this.selfSubscribed = selfSubscribed;
+	constructor() {
         this.id = uuidv4();
 	}
 
+    protected initialize(): void {
+        this.sub(serverMetaChannel);
+        this.pub(serverMetaChannel, {
+            clients: {
+                [this.id]: {
+                }
+            }
+        }, true, false);
+    }
+
     // Helper / convenience methods
     protected getChannelName<T extends JSONValue>(channel: Channel<T>): string {
-        return channelPrefix+channel.name;
+        let topicMode: string;
+        if (channel.mode === "topic") {
+            topicMode = topicPrefix;
+        } else if (channel.mode === "service") {
+            topicMode = servicePrefix;
+        } else {
+            throw new Error("Invalid channel mode");
+        }
+        let topicType: string;
+        if (channel.meta === true) {
+            topicType = metaPrefix;
+        } else {
+            topicType = userPrefix;
+        }
+        return [channelPrefix, topicMode, topicType].join("")+channel.name;
     }
 
     hasValidTopic<T extends JSONValue>(channel: Channel<T>): boolean {
@@ -110,7 +134,7 @@ export abstract class BaseClient<V = void> {
         }, "serviceResponse"), [dest]);
     }
 
-    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T) => void): void {
+    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T) => void, initialUpdate: boolean=true): void {
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
@@ -141,6 +165,9 @@ export abstract class BaseClient<V = void> {
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
             this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
+        }
+        if (initialUpdate && this.hasValidTopic(channel)) {  
+            handler?.(this.getTopic(channel));
         }
     }
 
@@ -197,14 +224,12 @@ export abstract class BaseClient<V = void> {
         if (msg.noHandler) {
             rejector(new Error("No service handler"));
         } else {
-            // console.log("Resolving service promise");
             resolver(msg.responseData as U);
         }
     }
 
-    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender: V) {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: V) {
         // Get the handler
-        // console.log("Received service message: ", msg);
         const eventName = this.getChannelName(channel);
         const handler = this.serviceHandlerMap.get(eventName);
         if (handler === undefined) {
@@ -224,30 +249,46 @@ export abstract class BaseClient<V = void> {
      * Common behaviour: If you receive a topic message, you should update your topic
      * Server specific behaviour: Directly broadcast the message to all other clients
      */
-    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender: V) {
+    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender?: V) {
         // See if we have the topic initialized. It should, because we need to initalize it before we can receive updates.
         const eventName = this.getChannelName(channel);
         const currentTopic = this.topicMap.get(eventName);
-        // console.log(eventName, currentTopic);
         if (this.topicMap.has(eventName) === false) {
             throw new Error(`Topic for channel ${channel.name} not initialized`);
         };
         // Cast the message to the correct type
         const diffResult = msg as unknown as DiffResult<T, T>;
         // Update the topic
+        // const oldTopic = cloneDeep(currentTopic);
         const newTopic = mergeDiff(currentTopic, diffResult);
         // See if the new topic is valid according to the topic schema
+        const previouslyValid = this.topicsValid.get(eventName) ?? false;
         const valid = channel.schema.safeParse(newTopic).success;
         // Update the topic validity and value, and call the handler if it is valid and if there are any changes
-        if (valid) {
-            this.topicsValid.set(eventName, true);
-            // Call the handler if there are any changes
-            if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
-                this.topicMap.set(eventName, newTopic);
-                this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+        if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
+            if (previouslyValid !== valid) { // 
+                if (valid) {
+                    console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
+                    this.topicsValid.set(eventName, true);
+                    this.topicMap.set(eventName, newTopic);
+                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                } else {
+                    console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
+                    // Still update the topic value, but don't call the handler
+                    this.topicMap.set(eventName, newTopic);
+                }
+            } else {
+                if (valid) {
+                    console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
+                    // If previously valid and now is still valid, apply the changes
+                    this.topicMap.set(eventName, newTopic);
+                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                } else {
+                    console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
+                    // If previously valid and now is invalid, don't apply the changes
+                }
             }
-        } else {
-            this.topicsValid.set(eventName, false);
+            console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
         }
     }
 
@@ -266,36 +307,40 @@ export abstract class BaseClient<V = void> {
 
     // Not recommended for use with allowDeletions since multiple clients can accidentally overwrite each other's topic
     // Only use if you are sure that the topic is not being updated by other clients
-    _set<T extends JSONValue>(channel: Channel<T>, topic: T, allowDeletions: boolean = false, source?: string): void {
-        const currentTopic = this.topicMap.get(channelPrefix+channel.name);
+    _set<T extends JSONValue>(channel: Channel<T>, data: RecursivePartial<T>, updateSelf: boolean = true, allowDeletions: boolean = false, source?: string): void {
+        const eventName = this.getChannelName(channel);
+        const currentTopic = this.topicMap.get(eventName);
         if (currentTopic === undefined) {
             throw new Error("Channel not found");
         }
-        const diffResult = diff(currentTopic as T, topic);
+        const diffResult = diff(currentTopic as T, data as JSONValue);
         // Disallow deletions of topic properties
         if (!allowDeletions) {
             diffResult.deleted = undefined;
         }
         // Only emit if there are changes
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
-            this.topicMap.set(channelPrefix+channel.name, topic);
-            this.sendDiffTopic(channel as TopicChannel<T>, diffResult, source);    
-            if (this.selfSubscribed) {
-                this.topicHandlerMap.get(channelPrefix+channel.name)?.forEach(handler => handler(topic));
+            // Apply the changes to the topic
+            const newTopic = mergeDiff(currentTopic, diffResult);
+            this.topicMap.set(eventName, newTopic);
+            this.sendDiffTopic(channel as TopicChannel<T>, diffResult as DiffResult<T, T>, source); 
+            if (updateSelf) {
+                // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                // Send yourself the message, so that it runs through the same logic as if it was received from another client
+                this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this.id) as WithMeta<TopicMessage>)
             }
         }
     }
 
-    pub<T extends JSONValue>(channel: TopicChannel<T>, topic: T, source?: string,): void {
+    pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf?: boolean, publishDeletes: boolean=true, source?: string,): void {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
-        this._set(channel, topic, false, source);
+        this._set(channel, data, updateSelf, publishDeletes, source);
     }
 
     // req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, timeout: number=10000): Promise<U> { // TODO: Support multiple destinations
     req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number=10000): Promise<U> {
-        // console.log(Date.now())
         this.listenServiceChannel(channel);
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
