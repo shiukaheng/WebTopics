@@ -163,7 +163,7 @@ export abstract class BaseClient<V = void> {
                 }
                 console.warn(`Invalid message received for topic channel ${channel.name}:`, msg);
             });
-            // this.sendRequestFullTopic(channel);
+            this.sendRequestFullTopic(channel);
         }
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
@@ -305,7 +305,8 @@ export abstract class BaseClient<V = void> {
         if (this.hasValidTopic(channel)) {
             this.sendFullTopic(channel);
         } else {
-            console.warn(`Invalid topic for channel ${channel.name} - cannot send full topic`);
+            console.warn(`Invalid topic for channel ${channel.name}, sending anyway`);
+            this.sendFullTopic(channel);
         }
     }
 
@@ -393,16 +394,17 @@ export abstract class BaseClient<V = void> {
     }
 
     protected getTopic<T extends JSONValue>(channel: Channel<T>): T {
+        const channelName = this.getChannelName(channel);
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
-        const currentTopic = this.topicMap.get(channelPrefix+channel.name);
+        const currentTopic = this.topicMap.get(channelName);
         if (currentTopic === undefined) {
-            throw new Error("Channel not found");
+            throw new Error(`Topic ${channel.name} not found`);
         }
-        if (!this.topicsValid.get(channelPrefix+channel.name)) {
-            throw new Error("Topic is not valid");
-        }
+        // if (!this.topicsValid.get(channelName)) {
+        //     throw new Error("Topic is not valid");
+        // }
         return currentTopic as T;
     }
 }

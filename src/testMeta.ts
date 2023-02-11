@@ -17,7 +17,7 @@ setTimeout(()=>{
     const client1 = new TopicClient("http://localhost:3002");
 }
 , 1000);
-setTimeout(()=>{
-    const client2 = new TopicClient("http://localhost:3002");
-}
-, 2000);
+// setTimeout(()=>{
+//     const client2 = new TopicClient("http://localhost:3002");
+// }
+// , 2000);
