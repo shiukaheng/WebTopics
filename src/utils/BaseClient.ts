@@ -102,6 +102,7 @@ export abstract class BaseClient<V = void> {
     }
 
     sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
+        console.log(`Client ${this.id} sending full topic for channel ${channel.name}`)
         // Try to get full topic from channel
         const fullTopic = this.getTopic(channel);
         if (fullTopic === undefined) {
@@ -116,6 +117,7 @@ export abstract class BaseClient<V = void> {
     }
 
     sendRequestFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
+        console.log(`Client ${this.id} sending request full topic for channel ${channel.name}`)
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullTopic", source), "*");
     }
 
@@ -161,6 +163,7 @@ export abstract class BaseClient<V = void> {
                 }
                 console.warn(`Invalid message received for topic channel ${channel.name}:`, msg);
             });
+            // this.sendRequestFullTopic(channel);
         }
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
@@ -266,29 +269,30 @@ export abstract class BaseClient<V = void> {
         const valid = channel.schema.safeParse(newTopic).success;
         // Update the topic validity and value, and call the handler if it is valid and if there are any changes
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
-            if (previouslyValid !== valid) { // 
+            // console.log("Previously valid: ", previouslyValid)
+            if (previouslyValid !== true) {
                 if (valid) {
-                    console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
+                    // console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
                     this.topicsValid.set(eventName, true);
                     this.topicMap.set(eventName, newTopic);
                     this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 } else {
-                    console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
+                    // console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
                     // Still update the topic value, but don't call the handler
                     this.topicMap.set(eventName, newTopic);
                 }
             } else {
                 if (valid) {
-                    console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
+                    // console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
                     // If previously valid and now is still valid, apply the changes
                     this.topicMap.set(eventName, newTopic);
                     this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 } else {
-                    console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
+                    // console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
                     // If previously valid and now is invalid, don't apply the changes
                 }
             }
-            console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
+            // console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
         }
     }
 

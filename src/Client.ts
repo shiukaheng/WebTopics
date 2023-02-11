@@ -19,6 +19,7 @@ export class TopicClient extends BaseClient {
         this.socket.on("id", (data: any) => {
             this.serverID = data as string;
         });
+        console.log(`🤖 Created client with ID ${this.id}`);
     }
     protected onRawEvent(event: string, listener: (data: any) => void): void {
         this.socket.on(event, listener);
