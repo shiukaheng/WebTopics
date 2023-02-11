@@ -56,6 +56,7 @@ export abstract class BaseClient<V = void> {
 	}
 
     protected initialize(): void {
+        console.log("Initializing client");
         this.sub(serverMetaChannel);
         this.pub(serverMetaChannel, {
             clients: {
@@ -277,27 +278,26 @@ export abstract class BaseClient<V = void> {
             // console.log("Previously valid: ", previouslyValid)
             if (previouslyValid !== true) {
                 if (valid) {
-                    console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
+                    // console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
                     this.topicsValid.set(eventName, true);
                     this.topicMap.set(eventName, newTopic);
                     this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 } else {
-                    console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
+                    // console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
                     // Still update the topic value, but don't call the handler
                     this.topicMap.set(eventName, newTopic);
                 }
             } else {
                 if (valid) {
-                    console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
+                    // console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
                     // If previously valid and now is still valid, apply the changes
                     this.topicMap.set(eventName, newTopic);
                     this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 } else {
-                    console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
+                    // console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
                     // If previously valid and now is invalid, don't apply the changes
                 }
             }
-            console.log(`${this.id}:`, newTopic);
             // console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
         }
     }
@@ -347,6 +347,7 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
+        console.log(`📢 ${this.id} publishing to ${channel.name}:`, data);
         this._set(channel, data, updateSelf, publishDeletes, source);
     }
 

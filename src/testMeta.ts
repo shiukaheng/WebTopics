@@ -15,6 +15,9 @@ server.sub(serverMetaChannel, (data)=>{
 // Make the 3 clients connect 1 by 1 with a 1 second delay
 setTimeout(()=>{
     const client1 = new TopicClient("http://localhost:3002");
+    client1.sub(serverMetaChannel, (data)=>{
+        console.log("🎊 Client 1 server meta:", data);
+    })
 }
 , 1000);
 // setTimeout(()=>{

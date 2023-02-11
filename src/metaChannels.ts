@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTopic, makeChannelMeta } from "./utils/createChannel";
 
 export const serverMetaSchema = z.object({
-    serverID: z.string(),
+    serverID: z.string().optional(),
     clients: z.record(z.object({
         services: z.record(z.string()).optional(),
     }))
