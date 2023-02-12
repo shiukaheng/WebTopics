@@ -6,6 +6,7 @@ import { JSONObject, JSONValue } from "./JSON";
 import { v4 as uuidv4 } from 'uuid';
 import { serverMetaChannel } from "../metaChannels";
 import { cloneDeep } from "lodash";
+import zodToJsonSchema from "zod-to-json-schema";
 
 export const channelPrefix = "ch-";
 export const servicePrefix = "sv-";
@@ -61,6 +62,9 @@ export abstract class BaseClient<V = void> {
         this.pub(serverMetaChannel, {
             clients: {
                 [this.id]: {
+                    services: {
+
+                    }
                 }
             }
         }, true, false);
@@ -179,7 +183,6 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "service") throw new Error("Channel is not a service channel");
         // Initialize channel
         const eventName = this.getChannelName(channel);
-        const channelType = channel.mode;
         this.listenServiceChannel(channel);
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
@@ -210,6 +213,19 @@ export abstract class BaseClient<V = void> {
                 }
                 console.warn(`Invalid message received for service channel ${channel.name}:`, msg);
             });
+            // Publish to serverMetaChannel that we are serving this channel
+            this.pub(serverMetaChannel, {
+                clients: {
+                    [this.id]: {
+                        services: {
+                            [channel.name]: {
+                                schema: zodToJsonSchema(channel.schema),
+                                responseSchema: (channel.responseSchema === undefined) ? undefined : zodToJsonSchema(channel.responseSchema)
+                            }
+                        }
+                    }
+                }
+            }, true, false);
         }
     }
 
