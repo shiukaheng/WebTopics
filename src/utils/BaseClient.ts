@@ -103,9 +103,9 @@ export abstract class BaseClient<V = void> {
     }
 
     sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
-        console.log(`Client ${this.id} sending full topic for channel ${channel.name}`)
+        // console.log(`Client ${this.id} sending full topic for channel ${channel.name}`)
         // Try to get full topic from channel
-        const fullTopic = this.getTopic(channel);
+        const fullTopic = this._getUnsafeTopic(channel);
         if (fullTopic === undefined) {
             console.warn(`Cannot send full topic for channel ${channel.name} - no full topic available`);
             return;
@@ -118,7 +118,7 @@ export abstract class BaseClient<V = void> {
     }
 
     sendRequestFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
-        console.log(`Client ${this.id} sending request full topic for channel ${channel.name}`)
+        // console.log(`Client ${this.id} sending request full topic for channel ${channel.name}`)
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullTopic", source), "*");
     }
 
@@ -347,7 +347,7 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
-        console.log(`📢 ${this.id} publishing to ${channel.name}:`, data);
+        // console.log(`📢 ${this.id} publishing to ${channel.name}:`, data);
         this._set(channel, data, updateSelf, publishDeletes, source);
     }
 
@@ -400,7 +400,7 @@ export abstract class BaseClient<V = void> {
         return id;
     }
 
-    protected getTopic<T extends JSONValue>(channel: Channel<T>): T {
+    protected _getUnsafeTopic<T extends JSONValue>(channel: Channel<T>): RecursivePartial<T> {
         const channelName = this.getChannelName(channel);
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
@@ -412,6 +412,21 @@ export abstract class BaseClient<V = void> {
         // if (!this.topicsValid.get(channelName)) {
         //     throw new Error("Topic is not valid");
         // }
+        return currentTopic as RecursivePartial<T>;
+    }
+
+    getTopic<T extends JSONValue>(channel: TopicChannel<T>): T {
+        const channelName = this.getChannelName(channel);
+        if (channel.mode !== "topic") {
+            throw new Error("Channel is not a topic channel");
+        }
+        const currentTopic = this.topicMap.get(channelName);
+        if (currentTopic === undefined) {
+            throw new Error(`Topic ${channel.name} not found`);
+        }
+        if (!this.topicsValid.get(channelName)) {
+            throw new Error("Topic is not valid");
+        }
         return currentTopic as T;
     }
 }

@@ -22,12 +22,13 @@ export class TopicServer extends BaseClient<Socket> {
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
     private clientMeta: ServerMeta = {
-        clients: {}
+        serverID: this.id,
+        clients: { // Server will fill in itself too, so no need to add it here
+        }
     };
     static metaChannels = ["id"]; // Extra channels the server handles with onRawEvent
     constructor(server: Server) {
         super();
-        this.id = "server"
         this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
@@ -75,12 +76,12 @@ export class TopicServer extends BaseClient<Socket> {
         });
     }
     protected initialize(): void {
-        super.initialize();
         this.sub(serverMetaChannel, (data: ServerMeta) => {
             this.clientMeta = data;
         });
         console.log("Publishing server ID");
-        super.pub(serverMetaChannel, {serverID: this.id}, true, false);
+        super.pub(serverMetaChannel, this.clientMeta, true, false);
+        super.initialize(); // Initialize afterwards, so we publish server ID first, so the subscription doesnt overwrite client meta (and its server ID)
     }
     // General listener for event on all clients
     protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {

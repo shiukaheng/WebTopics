@@ -9,9 +9,9 @@ import { BaseClient} from "./utils/BaseClient";
 export class TopicClient extends BaseClient {
     private socket: Socket;
     public serverID: string | undefined;
-    constructor(serverURL: string) {
+    constructor(socketClient: Socket) {
         super();
-        this.socket = io(serverURL);
+        this.socket = socketClient;
         this.initialize();
         this.socket.on("connect", () => {
             this.socket.emit("id", this.id);
@@ -19,7 +19,6 @@ export class TopicClient extends BaseClient {
         this.socket.on("id", (data: any) => {
             this.serverID = data as string;
         });
-        console.log(`🤖 Created client with ID ${this.id}`);
     }
     protected onRawEvent(event: string, listener: (data: any) => void): void {
         this.socket.on(event, listener);
