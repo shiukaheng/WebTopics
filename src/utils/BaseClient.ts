@@ -445,4 +445,19 @@ export abstract class BaseClient<V = void> {
         }
         return currentTopic as T;
     }
+
+    listClients(): string[] {
+        // Read off of serverMetaChannel
+        try {
+            const serverMeta = this.getTopic(serverMetaChannel);
+            if (serverMeta.clients === undefined) {
+                return [];
+            } else {
+                // Get keys
+                return Object.keys(serverMeta.clients);
+            }
+        } catch (e) {
+            return [];
+        }
+    }
 }
