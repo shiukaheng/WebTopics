@@ -1,7 +1,8 @@
 {
   "name": "webtopics",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "1.0.2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec ts-node src/index.ts",
@@ -17,12 +18,12 @@
     "@types/lodash": "^4.14.191",
     "@types/node": "^18.11.18",
     "@types/uuid": "^9.0.0",
+    "json-schema": "^0.4.0",
     "lodash": "^4.17.21",
     "nodemon": "^2.0.20",
     "rimraf": "^4.1.2",
-    "socket.io": "^4.5.4",
-    "socket.io-client": "^4.5.4",
-    "socket.io-p2p-server": "^1.2.0",
+    "socket.io": "^4.6.0",
+    "socket.io-client": "^4.6.0",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.5",
     "uuid": "^9.0.0",
@@ -32,5 +33,8 @@
   "description": "",
   "files": [
     "dist"
-  ]
+  ],
+  "devDependencies": {
+    "@types/json-schema": "^7.0.11"
+  }
 }
