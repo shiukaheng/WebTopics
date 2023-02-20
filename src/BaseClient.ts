@@ -39,7 +39,7 @@ export type DestType = string[] | "*";
 export abstract class BaseClient<V = void> {
     protected channelSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
     protected channelResponseSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
-    protected topicHandlerMap: Map<string, ((value: JSONValue) => void)[]> = new Map();
+    protected topicHandlerMap: Map<string, ((value: JSONValue, diff?: DiffResult<JSONValue, JSONValue>) => void)[]> = new Map();
     protected topicMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected topicsValid: Map<string, boolean> = new Map();
     protected serviceHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
@@ -296,7 +296,7 @@ export abstract class BaseClient<V = void> {
                     // console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
                     this.topicsValid.set(eventName, true);
                     this.topicMap.set(eventName, newTopic);
-                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic, diffResult));
                 } else {
                     // console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
                     // Still update the topic value, but don't call the handler
@@ -307,7 +307,7 @@ export abstract class BaseClient<V = void> {
                     // console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
                     // If previously valid and now is still valid, apply the changes
                     this.topicMap.set(eventName, newTopic);
-                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic, diffResult));
                 } else {
                     // console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
                     // If previously valid and now is invalid, don't apply the changes
