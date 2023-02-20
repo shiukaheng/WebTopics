@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { Channel, ServiceChannel, TopicChannel } from "./Channel";
-import { diff, DiffResult, mergeDiff, RecursivePartial } from "./Compare";
-import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "../messages/Messages";
-import { JSONObject, JSONValue } from "./JSON";
+import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
+import { diff, DiffResult, mergeDiff, RecursivePartial } from "./utils/Compare";
+import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "./messages/Messages";
+import { JSONObject, JSONValue } from "./utils/JSON";
 import { v4 as uuidv4 } from 'uuid';
-import { serverMetaChannel } from "../metaChannels";
+import { serverMetaChannel, ServerMeta } from "./metaChannels";
 import { cloneDeep } from "lodash";
 import zodToJsonSchema from "zod-to-json-schema";
 
@@ -57,7 +57,6 @@ export abstract class BaseClient<V = void> {
 	}
 
     protected initialize(): void {
-        console.log("Initializing client");
         this.sub(serverMetaChannel);
         this.pub(serverMetaChannel, {
             clients: {
@@ -459,5 +458,23 @@ export abstract class BaseClient<V = void> {
         } catch (e) {
             return [];
         }
+    }
+
+    // TODO: We need a way to unsubscribe from a topic soon, but for now we can just use this. This will leak memory if we repeatedly call it.
+    getServerID(): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error("Server ID timed out"));
+            }, 10000);
+            var resolved = false;
+            const handler = (topic: ServerMeta) => {
+                if (topic.serverID !== undefined && !resolved) {
+                    resolved = true;
+                    clearTimeout(timeout);
+                    resolve(topic.serverID);
+                }
+            }
+            this.sub(serverMetaChannel, handler);
+        });
     }
 }

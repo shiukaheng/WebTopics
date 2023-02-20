@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { WithMeta, TopicMessage, RequestFullTopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
-import { BaseClient, channelPrefix, DestType} from "./utils/BaseClient";
+import { BaseClient, channelPrefix, DestType} from "./BaseClient";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
 import { DiffResult } from "./utils/Compare";
 import { JSONObject, JSONValue } from "./utils/JSON";
@@ -79,7 +79,6 @@ export class TopicServer extends BaseClient<Socket> {
         this.sub(serverMetaChannel, (data: ServerMeta) => {
             this.clientMeta = data;
         });
-        console.log("Publishing server ID");
         super.pub(serverMetaChannel, this.clientMeta, true, false);
         super.initialize(); // Initialize afterwards, so we publish server ID first, so the subscription doesnt overwrite client meta (and its server ID)
     }
