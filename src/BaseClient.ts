@@ -140,7 +140,7 @@ export abstract class BaseClient<V = void> {
         }, "serviceResponse"), [dest]);
     }
 
-    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T) => void, initialUpdate: boolean=true): void {
+    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T, diff?: DiffResult<T, T>) => void, initialUpdate: boolean=true): void {
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
