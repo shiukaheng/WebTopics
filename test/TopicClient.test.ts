@@ -1,17 +1,28 @@
-import { createService, createTopic, TopicServer } from "../src"
+import { createService, createTopic, TopicClient, TopicServer } from "../src"
 import { Server } from "socket.io"
-import { describe, expect, test } from "@jest/globals"
+import { afterAll, describe, expect, test } from "@jest/globals"
 import { z } from "zod"
+import { io, Socket } from "socket.io-client"
 
-describe("TopicServer tests", () => {
-    const server = new Server()
-    var impl: TopicServer
-    // Test constructor
-    test("should be able to create a new TopicServer", () => {
-        impl = new TopicServer(server)
-        expect(impl).toBeDefined();
-    })
-    // === TESTS FOR TOPICS ===
+describe("TopicClient tests", () => {
+    // Create server
+    var server_created = false
+    var socketServerPort = 0
+    var socketServer: Server | undefined
+    while (!server_created) {
+        try {
+            socketServerPort = Math.floor(Math.random() * 10000) + 10000
+            socketServer = new Server(socketServerPort)
+            server_created = true
+        } catch (e) {
+            console.log("Port already in use")
+        }
+    }
+    if (socketServer === undefined) {
+        throw new Error("Could not create server")
+    }
+    const topicServer = new TopicServer(socketServer)
+    // Create topic
     const testTopicSchema = z.object({
         testString: z.string(),
         testNumber: z.number(),
@@ -22,8 +33,25 @@ describe("TopicServer tests", () => {
         })
     })
     const testTopic = createTopic("test", testTopicSchema)
+    // Create service
+    const testService = createService("test", z.object({
+        a: z.number(),
+        b: z.number()
+    }),
+        z.number()
+    )
+    var topicClient: TopicClient;
+    var socketClient = io(`http://localhost:${socketServerPort}`)
+    // Initalize server with topics and services so they are handled / forwarded
+    topicServer.initChannels([testTopic, testService])
+    // Create clients
+    test("should be able to create a new TopicClient", () => {
+        topicClient = new TopicClient(socketClient)
+        expect(topicClient).toBeDefined();
+    })
+    // === TESTS FOR TOPICS ===
     test("should be able to publish to a topic", () => {
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testString: "test",
             testNumber: 1,
             testBoolean: true,
@@ -34,7 +62,7 @@ describe("TopicServer tests", () => {
         })
     })
     test("should be able to subscribe to a topic, and get its initial value if its available", (done) => {
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             expect(data).toBeDefined()
             done()
         })
@@ -42,11 +70,11 @@ describe("TopicServer tests", () => {
     })
     test("should be able to unsubscribe from a topic", (done) => {
         var called = false
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             called = true
         }, false)
         unsub()
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testString: "initial",
             testNumber: 1,
             testBoolean: true,
@@ -62,7 +90,7 @@ describe("TopicServer tests", () => {
     })
     test("should be able to subscribe to a topic, and not get its initial value if its available, if initialUpdate is false", (done) => {
         var called = false
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             called = true
         }, false)
         setTimeout(() => {
@@ -73,13 +101,13 @@ describe("TopicServer tests", () => {
     })
     test("should be able to get new values when complete state is published", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testString should be "test2" now
             expect(data.testString).toBe("test2")
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testString: "test2",
             testNumber: 1,
             testBoolean: true,
@@ -91,82 +119,82 @@ describe("TopicServer tests", () => {
     })
     test("should be able to get new values when partial state is published - strings", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testString should be "test3" now
             expect(data.testString).toBe("test3")
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testString: "test3"
         }, true, false)
     })
     test("should be able to get new values when partial state is published - numbers", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testNumber should be 2 now
             expect(data.testNumber).toBe(2)
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testNumber: 2
         }, true, false)
     })
     test("should be able to get new values when partial state is published - booleans", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testBoolean should be false now
             expect(data.testBoolean).toBe(false)
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testBoolean: false
         }, true, false)
     })
     test("should be able to get new values when partial state is published - arrays", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testArray should be ["test2"] now
             expect(data.testArray).toEqual(["test2"])
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testArray: ["test2"]
         }, true, false)
     })
     test("should be able to get new values when partial state is published - objects", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testObject should be { testNestedString: "test2" } now
             expect(data.testObject).toEqual({ testNestedString: "test2" })
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testObject: { testNestedString: "test2" }
         }, true, false)
     })
     test("should be able to get new values when partial state is published - nested objects", (done) => {
         // Subscribe first, then publish
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             // testObject.testNestedString should be "test3" now
             expect(data.testObject.testNestedString).toBe("test3")
             done()
             unsub()
         }, false)
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testObject: { testNestedString: "test3" }
         }, true, false)
     })
     test("should not receive errors if a topic is published with invalid data", (done) => {
         var called = false
-        const unsub = impl.sub(testTopic, (data) => {
+        const unsub = topicClient.sub(testTopic, (data) => {
             called = true
         }, false) // False so we don't get the initial value
-        impl.pub(testTopic, {
+        topicClient.pub(testTopic, {
             testString: 1 as any,
         }, true, false)
         setTimeout(() => {
@@ -176,22 +204,21 @@ describe("TopicServer tests", () => {
         }, 100)
     })
     // === TESTS FOR SERVICES ===
-    const testService = createService("test", z.object({
-        a: z.number(),
-        b: z.number()
-    }),
-        z.number()
-    )
     test("should be able to serve a service", (done) => {
-        impl.srv(testService, (data) => {
+        topicClient.srv(testService, (data) => {
             return data.a + data.b
         })
-        impl.req(testService, {
+        topicClient.req(testService, {
             a: 1,
             b: 2
-        }, impl.id).then((data) => {
+        }, topicClient.id).then((data) => {
             expect(data).toBe(3)
             done()
         })
+    })
+    // Destroy server and clients
+    afterAll(() => {
+        socketServer?.close()
+        socketClient?.close()
     })
 })

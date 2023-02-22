@@ -194,4 +194,17 @@ export class TopicServer extends BaseClient<Socket> {
             this.relay(channel, msg, sender, [msg.dest]);
         }
     }
+
+    initChannels(channels: Array<TopicChannel<any>|ServiceChannel<any, any>>): void {
+        channels.forEach((channel) => {
+            // If channel is a topic channel, run initTopicChannel
+            if (channel.mode === "topic") {
+                this.initTopicChannel(channel);
+            }
+            // If channel is a service channel, run initServiceChannel
+            if (channel.mode === "service") {
+                this.initServiceChannel(channel);
+            }
+        });
+    }
 }

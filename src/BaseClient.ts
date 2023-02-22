@@ -168,7 +168,7 @@ export abstract class BaseClient<V = void> {
         return unsubscriber;
     }
 
-    private initTopicChannel<T extends JSONValue>(channel: TopicChannel<T>) {
+    protected initTopicChannel<T extends JSONValue>(channel: TopicChannel<T>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.topicMap.set(eventName, {});
@@ -209,13 +209,14 @@ export abstract class BaseClient<V = void> {
         }
     }
 
-    private initServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
+    protected initServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.channelSchemaMap.set(eventName, channel.schema);
             this.channelResponseSchemaMap.set(eventName, channel.responseSchema);
             // Add raw event listener
             this.onRawEvent(eventName, (msg: MessageMeta, sender?: V) => {
+                console.log("Received service message", msg, sender);
                 const validMessage = metaMessageSchema.safeParse(msg).success;
                 if (!validMessage) {
                     console.warn("Invalid message received: ", msg);
@@ -254,7 +255,6 @@ export abstract class BaseClient<V = void> {
      * Server: If the message is for another client, they should forward the message to that client
      */
     protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: V) {
-        console.log("Received service response message: ", msg);
         const resolver = this.serviceResolvers.get(msg.serviceId);
         const rejector = this.serviceRejectors.get(msg.serviceId);
         if (resolver === undefined || rejector === undefined) {
@@ -407,7 +407,7 @@ export abstract class BaseClient<V = void> {
                 reject(new Error("Service timed out"));
             }, timeout);
             // Add the promise to the map
-            console.log("Adding service promise", id);
+            // console.log("Adding service promise", id);
             this.serviceResolvers.set(id, (result: JSONValue) => {
                 clearTimeout(timeoutId);
                 this.serviceResolvers.delete(id);
@@ -420,7 +420,7 @@ export abstract class BaseClient<V = void> {
                 this.serviceRejectors.delete(id);
                 reject(reason);
             })
-            console.log("Service promise added", this.serviceResolvers);
+            // console.log("Service promise added", this.serviceResolvers);
         });
         // Send the service request
         this.sendServiceMessage(channel, serviceData, [dest], id);
