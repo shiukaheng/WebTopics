@@ -177,23 +177,23 @@ describe("TopicServer", () => {
         }, 100)
     })
     // === TESTS FOR SERVICES ===
-    // const testService = createService("test", z.object({
-    //     a: z.number(),
-    //     b: z.number()
-    // }),
-    //     z.number()
-    // )
-    // test("should be able to serve a service", (done) => {
-    //     topicServer.srv(testService, (data) => {
-    //         return data.a + data.b
-    //     })
-    //     topicServer.req(testService, {
-    //         a: 1,
-    //         b: 2
-    //     }, topicServer.id).then((data) => {
-    //         expect(data).toBe(3)
-    //         done()
-    //     })
-    // })
+    const testService = createService("test", z.object({
+        a: z.number(),
+        b: z.number()
+    }),
+        z.number()
+    )
+    test("should be able to serve a service", (done) => {
+        topicServer.srv(testService, (data) => {
+            return data.a + data.b
+        })
+        topicServer.req(testService, {
+            a: 1,
+            b: 2
+        }, topicServer._id).then((data) => {
+            expect(data).toBe(3)
+            done()
+        })
+    })
 
 })

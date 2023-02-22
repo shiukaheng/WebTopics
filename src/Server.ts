@@ -22,7 +22,7 @@ export class TopicServer extends BaseClient<Socket> {
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
     private clientMeta: ServerMeta = {
-        serverID: this.id,
+        serverID: this._id,
         clients: { // Server will fill in itself too, so no need to add it here
         }
     };
@@ -59,7 +59,7 @@ export class TopicServer extends BaseClient<Socket> {
                 }
             });
             // Send server ID to client
-            socket.emit("id", this.id);
+            socket.emit("id", this._id);
             // Add client to server meta
         });
         this.onRawEvent("id", (data: any, sender: Socket) => {
@@ -110,7 +110,7 @@ export class TopicServer extends BaseClient<Socket> {
                 } else {
                     throw new Error(`Client ${clientID} has socket ID ${socketID} but socket not found`);
                 }
-            } else if (clientID === this.id) {
+            } else if (clientID === this._id) {
                 // Ignore server
             } else {
                 console.warn(`Client ${clientID} not found`);
@@ -135,7 +135,7 @@ export class TopicServer extends BaseClient<Socket> {
                     } else {
                         throw new Error(`Client ${clientID} has socket ID ${socketID} but socket not found`);
                     }
-                } else if (clientID === this.id) {
+                } else if (clientID === this._id) {
                     // Ignore server
                 } else {
                     console.warn(`Client ${clientID} not found`);
@@ -165,7 +165,7 @@ export class TopicServer extends BaseClient<Socket> {
 
     protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender: Socket): void {
         // TODO: Skip if server not a recipient
-        if (msg.dest === "*" || msg.dest.includes(this.id)) {
+        if (msg.dest === "*" || msg.dest.includes(this._id)) {
             super.onReceiveServiceMessage(channel, msg, sender);
         }
         // TODO: Forwards service message to destination

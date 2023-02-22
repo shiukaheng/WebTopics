@@ -14,7 +14,7 @@ export class TopicClient extends BaseClient {
         this.socket = socketClient;
         this.initialize();
         this.socket.on("connect", () => {
-            this.socket.emit("id", this.id);
+            this.socket.emit("id", this._id);
         });
         this.socket.on("id", (data: any) => {
             this.serverID = data as string;

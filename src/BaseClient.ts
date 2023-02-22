@@ -45,7 +45,7 @@ export abstract class BaseClient<V = void> {
     protected topicMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
     protected topicsValid: Map<string, boolean> = new Map();
     protected serviceHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
-    protected id: string;
+    protected _id: string;
     protected serviceResolvers: Map<string, (data: JSONValue) => void> = new Map();
     protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
 
@@ -55,14 +55,14 @@ export abstract class BaseClient<V = void> {
 
     // Default constructor
 	constructor() {
-        this.id = uuidv4();
+        this._id = uuidv4();
 	}
 
     protected initialize(): void {
         this.sub(serverMetaChannel);
         this.pub(serverMetaChannel, {
             clients: {
-                [this.id]: {
+                [this._id]: {
                     services: {
 
                     }
@@ -96,7 +96,7 @@ export abstract class BaseClient<V = void> {
 
     // Messages
     protected wrapMessage(rawMessage: JSONObject, messageType: MessageType, source?: string): MessageMeta {
-        return {...rawMessage, timestamp: Date.now(), messageType, source: source ?? this.id};
+        return {...rawMessage, timestamp: Date.now(), messageType, source: source ?? this._id};
     }
 
     protected sendTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
@@ -235,7 +235,7 @@ export abstract class BaseClient<V = void> {
             // Publish to serverMetaChannel that we are serving this channel
             this.pub(serverMetaChannel, {
                 clients: {
-                    [this.id]: {
+                    [this._id]: {
                         services: {
                             [channel.name]: {
                                 schema: zodToJsonSchema(channel.schema),
@@ -373,7 +373,7 @@ export abstract class BaseClient<V = void> {
             if (updateSelf) {
                 // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 // Send yourself the message, so that it runs through the same logic as if it was received from another client
-                this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this.id) as WithMeta<TopicMessage>)
+                this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this._id) as WithMeta<TopicMessage>)
             }
         }
     }
