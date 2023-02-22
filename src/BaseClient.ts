@@ -36,6 +36,8 @@ export type OnReceiveServiceResponseMessageArgs<V = void> = {
 
 export type DestType = string[] | "*";
 
+export type Unsubscriber = () => void;
+
 export abstract class BaseClient<V = void> {
     protected channelSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
     protected channelResponseSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
@@ -140,8 +142,33 @@ export abstract class BaseClient<V = void> {
         }, "serviceResponse"), [dest]);
     }
 
-    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T, diff?: DiffResult<T, T>) => void, initialUpdate: boolean=true): void {
+    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T, diff?: DiffResult<T, T>) => void, initialUpdate: boolean=true): Unsubscriber {
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
+        this.initTopicChannel<T>(channel);
+        const eventName = this.getChannelName(channel);
+        this.channelSchemaMap.set(eventName, channel.schema);
+        if (handler !== undefined) {
+            this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
+        }
+        if (initialUpdate && this.hasValidTopic(channel)) {  
+            handler?.(this.getTopic(channel));
+        }
+        const unsubscriber = () => {
+            // Remove handler from handler map
+            const handlers = this.topicHandlerMap.get(eventName);
+            if (handlers !== undefined) {
+                const index = handlers.indexOf(handler as (topic: JSONValue) => void);
+                if (index !== -1) {
+                    handlers.splice(index, 1);
+                } else {
+                    console.warn("Handler not found in handler map");
+                }
+            }
+        }
+        return unsubscriber;
+    }
+
+    private initTopicChannel<T extends JSONValue>(channel: TopicChannel<T>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.topicMap.set(eventName, {});
@@ -160,7 +187,7 @@ export abstract class BaseClient<V = void> {
                 if (msg.messageType === "requestFullTopic" && requestFullTopicMessageSchema.safeParse(msg).success) {
                     this.onReceiveRequestFullTopicMessage<T>(channel, msg as WithMeta<RequestFullTopicMessage>, sender);
                     return;
-                } 
+                }
                 if (msg.messageType === "topic" && topicMessageSchema.safeParse(msg).success) {
                     this.onReceiveTopicMessage<T>(channel, msg as WithMeta<TopicMessage>, sender);
                     return;
@@ -168,13 +195,6 @@ export abstract class BaseClient<V = void> {
                 console.warn(`Invalid message received for topic channel ${channel.name}:`, msg);
             });
             this.sendRequestFullTopic(channel);
-        }
-        this.channelSchemaMap.set(eventName, channel.schema);
-        if (handler !== undefined) {
-            this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
-        }
-        if (initialUpdate && this.hasValidTopic(channel)) {  
-            handler?.(this.getTopic(channel));
         }
     }
 
@@ -362,7 +382,7 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
-        // console.log(`📢 ${this.id} publishing to ${channel.name}:`, data);
+        this.initTopicChannel(channel);
         this._set(channel, data, updateSelf, publishDeletes, source);
     }
 
