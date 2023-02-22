@@ -93,7 +93,6 @@ describe("TopicServer", () => {
         // Subscribe first, then publish
         const unsub = topicServer.sub(testTopic, (data) => {
             // testString should be "test3" now
-            console.log(data)
             expect(data.testString).toBe("test3")
             done()
             unsub()
@@ -190,7 +189,7 @@ describe("TopicServer", () => {
         topicServer.req(testService, {
             a: 1,
             b: 2
-        }, topicServer._id).then((data) => {
+        }, topicServer.id).then((data) => {
             expect(data).toBe(3)
             done()
         })

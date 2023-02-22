@@ -50,7 +50,7 @@ export abstract class BaseClient<V = void> {
     protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
 
     // Abstract methods
-    protected abstract onRawEvent(event: string, listener: (data: any, sender: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
+    protected abstract onRawEvent(event: string, listener: (data: any, sender?: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
     protected abstract emitRawEvent(event: string, data: any, destination: DestType): void;
 
     // Default constructor
@@ -176,7 +176,7 @@ export abstract class BaseClient<V = void> {
                 this.topicHandlerMap.set(eventName, []);
             }
             // Add raw event listener
-            this.onRawEvent(eventName, (msg: MessageMeta, sender: V) => {
+            this.onRawEvent(eventName, (msg: MessageMeta, sender?: V) => {
                 // Validate the message - in the sense that it is a valid message type, but doesn't guarantee that the topic is valid
                 const validMessage = metaMessageSchema.safeParse(msg).success;
                 if (!validMessage) {
@@ -202,20 +202,20 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "service") throw new Error("Channel is not a service channel");
         // Initialize channel
         const eventName = this.getChannelName(channel);
-        this.listenServiceChannel(channel);
+        this.initServiceChannel(channel);
         this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
             this.serviceHandlerMap.set(eventName, handler as (service: JSONValue) => U);
         }
     }
 
-    private listenServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
+    private initServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.channelSchemaMap.set(eventName, channel.schema);
             this.channelResponseSchemaMap.set(eventName, channel.responseSchema);
             // Add raw event listener
-            this.onRawEvent(eventName, (msg: MessageMeta, sender: V) => {
+            this.onRawEvent(eventName, (msg: MessageMeta, sender?: V) => {
                 const validMessage = metaMessageSchema.safeParse(msg).success;
                 if (!validMessage) {
                     console.warn("Invalid message received: ", msg);
@@ -253,7 +253,8 @@ export abstract class BaseClient<V = void> {
      * Common: If the message is for them, they should resolve the promise
      * Server: If the message is for another client, they should forward the message to that client
      */
-    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender: V) {
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: V) {
+        console.log("Received service response message: ", msg);
         const resolver = this.serviceResolvers.get(msg.serviceId);
         const rejector = this.serviceRejectors.get(msg.serviceId);
         if (resolver === undefined || rejector === undefined) {
@@ -342,7 +343,7 @@ export abstract class BaseClient<V = void> {
      * Common behaviour: If you receive a request for full topic, you should send the full topic if you have it
      * Server specific behaviour: Broadcast request for all clients
      */
-    protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender: V) {
+    protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender?: V) {
         if (this.hasValidTopic(channel)) {
             this.sendFullTopic(channel);
         } else {
@@ -388,7 +389,7 @@ export abstract class BaseClient<V = void> {
 
     // req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, timeout: number=10000): Promise<U> { // TODO: Support multiple destinations
     req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number=10000): Promise<U> {
-        this.listenServiceChannel(channel);
+        this.initServiceChannel(channel);
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
         }
@@ -397,15 +398,16 @@ export abstract class BaseClient<V = void> {
         if (!valid) {
             throw new Error("Service data is not valid");
         }
-        // Send the service
-        const id = this.sendServiceMessage(channel, serviceData, [dest]);
+        // Create a unique id for the service request
+        const id = uuidv4();
         // Create a promise that resolves when the response is received
-        return new Promise((resolve, reject) => {
+        const promise = new Promise<U>((resolve, reject) => {
             // Set a timeout
             const timeoutId = setTimeout(() => {
                 reject(new Error("Service timed out"));
             }, timeout);
             // Add the promise to the map
+            console.log("Adding service promise", id);
             this.serviceResolvers.set(id, (result: JSONValue) => {
                 clearTimeout(timeoutId);
                 this.serviceResolvers.delete(id);
@@ -418,21 +420,24 @@ export abstract class BaseClient<V = void> {
                 this.serviceRejectors.delete(id);
                 reject(reason);
             })
+            console.log("Service promise added", this.serviceResolvers);
         });
+        // Send the service request
+        this.sendServiceMessage(channel, serviceData, [dest], id);
+        return promise;
     }
 
-    protected sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType): string {
+    protected sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, commandID: string): string {
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
         }
-        const id = uuidv4();
         const msg: ServiceMessage = {
             serviceData,
-            serviceId: id,
+            serviceId: commandID,
             dest,
         }
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(msg as JSONObject, "service"), dest);
-        return id;
+        return commandID;
     }
 
     protected _getUnsafeTopic<T extends JSONValue>(channel: Channel<T>): RecursivePartial<T> {
@@ -496,5 +501,9 @@ export abstract class BaseClient<V = void> {
             }
             this.sub(serverMetaChannel, handler);
         });
+    }
+
+    get id(): string {
+        return this._id;
     }
 }

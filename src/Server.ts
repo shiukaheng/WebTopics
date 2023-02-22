@@ -17,7 +17,7 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 
 export class TopicServer extends BaseClient<Socket> {
     private clientSockets: Map<string, Socket>;
-    private channelHandlers: Map<string, (data: any, sender: Socket) => void>;
+    private channelHandlers: Map<string, (data: any, sender?: Socket) => void>;
     private socket: Server;
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
@@ -62,17 +62,21 @@ export class TopicServer extends BaseClient<Socket> {
             socket.emit("id", this._id);
             // Add client to server meta
         });
-        this.onRawEvent("id", (data: any, sender: Socket) => {
-            // Check if client ID is already in use
-            if (this.clientToSocketID.has(data)) {
-                // Disconnect this client
-                sender.disconnect();
-                console.warn(`Client ${data} already connected, disconnecting`);
-                return;
+        this.onRawEvent("id", (data: any, sender?: Socket) => {
+            if (sender !== undefined) {
+                // Check if client ID is already in use
+                if (this.clientToSocketID.has(data)) {
+                    // Disconnect this client
+                    sender.disconnect();
+                    console.warn(`Client ${data} already connected, disconnecting`);
+                    return;
+                }
+                this.clientToSocketID.set(data, sender.id);
+                this.socketToClientID.set(sender.id, data);
+                console.log(`✅ Client ${data} connected to server`);
+            } else {
+                throw new Error("No sender provided, should not happen for id event"); // No senders happen when server sends message to itself
             }
-            this.clientToSocketID.set(data, sender.id);
-            this.socketToClientID.set(sender.id, data);
-            console.log(`✅ Client ${data} connected to server`);
         });
     }
     protected initialize(): void {
@@ -83,7 +87,7 @@ export class TopicServer extends BaseClient<Socket> {
         super.initialize(); // Initialize afterwards, so we publish server ID first, so the subscription doesnt overwrite client meta (and its server ID)
     }
     // General listener for event on all clients
-    protected onRawEvent(event: string, listener: (data: any, sender: Socket) => void): void {
+    protected onRawEvent(event: string, listener: (data: any, sender?: Socket) => void): void {
         this.channelHandlers.set(event, listener);
     }
     protected emitRawEvent(event: string, data: any, dest: DestType): void {
@@ -91,6 +95,14 @@ export class TopicServer extends BaseClient<Socket> {
             // Broadcast to all sockets
             this.socket.emit(event, data);
         } else {
+            // See if we can find our own id, directly send to ourselves. 
+            // This use case is for calling our services without going through the server. Topics are always broadcasted so it won't be an issue.
+            if (dest.includes(this.id)) {
+                const handler = this.channelHandlers.get(event);
+                if (handler) {
+                    handler(data);
+                }
+            }
             // Find all sockets required
             let sockets: Socket[] = this.getSockets(dest);
             // Send message to all sockets
@@ -163,19 +175,23 @@ export class TopicServer extends BaseClient<Socket> {
     //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
     // };
 
-    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender: Socket): void {
-        // TODO: Skip if server not a recipient
-        if (msg.dest === "*" || msg.dest.includes(this._id)) {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: Socket): void {
+        // Skip if server not a recipient
+        if (msg.dest === "*" || msg.dest.includes(this.id)) {
             super.onReceiveServiceMessage(channel, msg, sender);
         }
-        // TODO: Forwards service message to destination
-        this.relay(channel, msg, sender, msg.dest);
+        // Forward service message to destination
+        if (sender !== undefined) {
+            this.relay(channel, msg, sender, msg.dest);
+        }
     }
 
-    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender: Socket): void {
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: Socket): void {
         // TODO: Skip if server not a recipient
         super.onReceiveServiceResponseMessage(channel, msg, sender);
         // TODO: Forwards service response to destination
-        this.relay(channel, msg, sender, [msg.dest]);
+        if (sender !== undefined) {
+            this.relay(channel, msg, sender, [msg.dest]);
+        }
     }
 }
