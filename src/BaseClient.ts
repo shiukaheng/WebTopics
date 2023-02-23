@@ -216,7 +216,7 @@ export abstract class BaseClient<V = void> {
             this.channelResponseSchemaMap.set(eventName, channel.responseSchema);
             // Add raw event listener
             this.onRawEvent(eventName, (msg: MessageMeta, sender?: V) => {
-                console.log("Received service message", msg, sender);
+                // console.log("Received service message", msg, sender);
                 const validMessage = metaMessageSchema.safeParse(msg).success;
                 if (!validMessage) {
                     console.warn("Invalid message received: ", msg);
