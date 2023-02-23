@@ -3,13 +3,16 @@
 import { io, Socket } from "socket.io-client";
 import { BaseClient} from "./BaseClient";
 
-// Adapt for server types
-// Make server mirror client messages so they get broadcasted to all clients
+
+export interface IClient {
+    on(event: string, listener: (data: any) => void): void;
+    emit(event: string, data: any): void;
+}
 
 export class TopicClient extends BaseClient {
-    private socket: Socket;
+    private socket: IClient;
     public serverID: string | undefined;
-    constructor(socketClient: Socket) {
+    constructor(socketClient: IClient) {
         super();
         this.socket = socketClient;
         this.initialize();

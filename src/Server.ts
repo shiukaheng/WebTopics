@@ -1,24 +1,34 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
-import { Server, Socket } from "socket.io";
-import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { WithMeta, TopicMessage, RequestFullTopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
+import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType} from "./BaseClient";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
-import { DiffResult } from "./utils/Compare";
-import { JSONObject, JSONValue } from "./utils/JSON";
+import { JSONValue } from "./utils/JSON";
 
-// Adapt for server types
-// Make server mirror client messages so they get broadcasted to all clients
+export interface IServerClient {
+    disconnect(): void;
+    id: string;
+    emit: (event: string, data: any) => void;
+    broadcast: {
+        emit: (event: string, data: any) => void;
+    }
+    onAny: (listener: (event: string, data: any) => void) => void;
+    on: (event: string, listener: (data: any) => void) => void;
+}
+
+export interface IServer {
+    on: (event: string, listener: (socket: IServerClient) => void) => void;
+    emit: (event: string, data: any) => void;
+}
 
 // TODO: Block spoofed messages
 // TODO: Server responses are currently broadcasted. We should probably add destination IDs to emitRawEvent and only send to those clients
 
-export class TopicServer extends BaseClient<Socket> {
-    private clientSockets: Map<string, Socket>;
-    private channelHandlers: Map<string, (data: any, sender?: Socket) => void>;
-    private socket: Server;
+export class TopicServer extends BaseClient<IServerClient> {
+    private clientSockets: Map<string, IServerClient>;
+    private channelHandlers: Map<string, (data: any, sender?: IServerClient) => void>;
+    private socket: IServer;
     private socketToClientID: Map<string, string> = new Map();
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
     private clientMeta: ServerMeta = {
@@ -27,7 +37,7 @@ export class TopicServer extends BaseClient<Socket> {
         }
     };
     static metaChannels = ["id"]; // Extra channels the server handles with onRawEvent
-    constructor(server: Server) {
+    constructor(server: IServer) {
         super();
         this.socket = server;
         this.clientSockets = new Map(); // Map of client sockets
@@ -62,7 +72,7 @@ export class TopicServer extends BaseClient<Socket> {
             socket.emit("id", this._id);
             // Add client to server meta
         });
-        this.onRawEvent("id", (data: any, sender?: Socket) => {
+        this.onRawEvent("id", (data: any, sender?: IServerClient) => {
             if (sender !== undefined) {
                 // Check if client ID is already in use
                 if (this.clientToSocketID.has(data)) {
@@ -87,7 +97,7 @@ export class TopicServer extends BaseClient<Socket> {
         super.initialize(); // Initialize afterwards, so we publish server ID first, so the subscription doesnt overwrite client meta (and its server ID)
     }
     // General listener for event on all clients
-    protected onRawEvent(event: string, listener: (data: any, sender?: Socket) => void): void {
+    protected onRawEvent(event: string, listener: (data: any, sender?: IServerClient) => void): void {
         this.channelHandlers.set(event, listener);
     }
     protected emitRawEvent(event: string, data: any, dest: DestType): void {
@@ -104,7 +114,7 @@ export class TopicServer extends BaseClient<Socket> {
                 }
             }
             // Find all sockets required
-            let sockets: Socket[] = this.getSockets(dest);
+            let sockets: IServerClient[] = this.getSockets(dest);
             // Send message to all sockets
             for (const socket of sockets) {
                 socket.emit(event, data);
@@ -112,7 +122,7 @@ export class TopicServer extends BaseClient<Socket> {
         }
     }
     private getSockets(dest: string[]) {
-        let sockets: Socket[] = [];
+        let sockets: IServerClient[] = [];
         for (const clientID of dest) {
             const socketID = this.clientToSocketID.get(clientID);
             if (socketID) {
@@ -131,13 +141,13 @@ export class TopicServer extends BaseClient<Socket> {
         return sockets;
     }
 
-    protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: Socket, dest: DestType = "*"): void {
+    protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: IServerClient, dest: DestType = "*"): void {
         if (dest === "*") {
             // Broadcast to all sockets
             senderSocket.broadcast.emit(this.getChannelName(channel), msg);
         } else {
             // Find all sockets required
-            let sockets: Socket[] = [];
+            let sockets: IServerClient[] = [];
             for (const clientID of dest) {
                 const socketID = this.clientToSocketID.get(clientID);
                 if (socketID) {
@@ -160,7 +170,7 @@ export class TopicServer extends BaseClient<Socket> {
         }
     }
 
-    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender?: Socket): void {
+    protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender?: IServerClient): void {
         super.onReceiveTopicMessage(channel, msg, sender);
         // TODO: Forwards topic message to all clients except sender
         if (sender !== undefined) { // When sender is undefined, it is the server itself
@@ -175,7 +185,7 @@ export class TopicServer extends BaseClient<Socket> {
     //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
     // };
 
-    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: Socket): void {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === "*" || msg.dest.includes(this.id)) {
             super.onReceiveServiceMessage(channel, msg, sender);
@@ -186,7 +196,7 @@ export class TopicServer extends BaseClient<Socket> {
         }
     }
 
-    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: Socket): void {
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === this.id) {
             super.onReceiveServiceResponseMessage(channel, msg, sender);
