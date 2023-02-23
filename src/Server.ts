@@ -187,9 +187,11 @@ export class TopicServer extends BaseClient<Socket> {
     }
 
     protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: Socket): void {
-        // TODO: Skip if server not a recipient
-        super.onReceiveServiceResponseMessage(channel, msg, sender);
-        // TODO: Forwards service response to destination
+        // Skip if server not a recipient
+        if (msg.dest === this.id) {
+            super.onReceiveServiceResponseMessage(channel, msg, sender);
+        }
+        // Forwards service response to destination
         if (sender !== undefined) {
             this.relay(channel, msg, sender, [msg.dest]);
         }

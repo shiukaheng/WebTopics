@@ -347,7 +347,7 @@ export abstract class BaseClient<V = void> {
         if (this.hasValidTopic(channel)) {
             this.sendFullTopic(channel);
         } else {
-            console.warn(`Invalid topic for channel ${channel.name}, sending anyway`);
+            // console.warn(`Invalid topic for channel ${channel.name}, sending anyway`);
             this.sendFullTopic(channel);
         }
     }

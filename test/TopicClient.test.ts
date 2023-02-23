@@ -216,7 +216,7 @@ describe("TopicClient tests", () => {
             done()
         })
     })
-    // Destroy server and clients
+    // Destroy socket.io server and clients. Disconnection messages are expected, since only the socket is closed, not the server
     afterAll(() => {
         socketServer?.close()
         socketClient?.close()
