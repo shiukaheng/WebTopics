@@ -70,6 +70,7 @@ export const serviceResponseMessageSchema = z.object({
     responseData: jsonValueSchema.optional(),
     serviceId: z.string(),
     dest: z.string(), // A service is only possibly requested by one client
+    errorMessage: z.string().optional(),
     noHandler: z.boolean().optional(),
 });
 export type ServiceResponseMessage = z.infer<typeof serviceResponseMessageSchema>;

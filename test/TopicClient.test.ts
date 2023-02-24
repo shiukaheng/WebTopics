@@ -242,6 +242,45 @@ describe("TopicClient tests", () => {
             done()
         })
     })
+    const testAsyncService = createService("testAsync", z.number(), z.number())
+    topicServer.initChannels([testAsyncService])
+    test("should be able to serve a service with a async function", (done) => {
+        topicClient.srv(testAsyncService, async (data) => {
+            // Set 5ms timeout to simulate async
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(data + 1)
+                }, 5)
+            })
+        })
+        topicClient.req(testAsyncService, topicClient.id, 1).then((data) => {
+            expect(data).toBe(2)
+            done()
+        })
+    })
+    const testAsyncTimeoutService = createService("testAsyncTimeout", z.number(), z.number())
+    topicServer.initChannels([testAsyncTimeoutService])
+    test("should return a client-side timeout error if a service takes too long to respond", (done) => {
+        const timeNow = Date.now()
+        console.log("Testing timeout")
+        topicClient.srv(testAsyncTimeoutService, async (data) => {
+            // Set 10 second timeout to simulate long async
+            return await new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(data + 1)
+                }, 10000)
+            })
+        })
+        topicClient.req(testAsyncTimeoutService, topicClient.id, 1).then((data) => { // Defaults to 100ms timeout
+            console.log("This should not be called")
+        }).catch((err) => {
+            // Log time taken
+            console.log("Time taken: " + (Date.now() - timeNow))
+            expect(err).toBeInstanceOf(Error)
+            console.log(err)
+            done()
+        })
+    })
     // Destroy socket.io server and clients. Disconnection messages are expected, since only the socket is closed, not the server
     afterAll(() => {
         socketServer?.close()
