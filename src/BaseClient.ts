@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
+import { Channel, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { TopicServer } from "./Server";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./utils/Compare";
 import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "./messages/Messages";
@@ -52,7 +52,7 @@ export abstract class BaseClient<V = void> {
     /**
      * Map of service channel names to their response schemas
      */
-    protected channelResponseSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
+    protected channelResponseSchemaMap: Map<string, z.ZodSchema<ServiceResponseType>> = new Map();
     /**
      * Map of topic channel names to a list of change handlers 
      */
@@ -68,7 +68,7 @@ export abstract class BaseClient<V = void> {
     /**
      * Map of service channel names to their handlers
      */
-    protected serviceHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
+    protected serviceHandlerMap: Map<string, (data: JSONValue) => ServiceResponseType> = new Map();
     /**
      * Internal ID of the client, not to be directly used; use the getter instead
      */
@@ -76,7 +76,7 @@ export abstract class BaseClient<V = void> {
     /**
      * Map of open service request IDs to their resolvers
      */
-    protected serviceResolvers: Map<string, (data: JSONValue) => void> = new Map();
+    protected serviceResolvers: Map<string, (data: ServiceResponseType) => void> = new Map();
     /**
      * Map of open service request IDs to their rejectors
      */
@@ -216,7 +216,7 @@ export abstract class BaseClient<V = void> {
      * @param id The service ID
      * @param dest The destination of the message
      */
-    sendNoServiceHandlerMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, id: string, dest: string) {
+    sendNoServiceHandlerMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             serviceId: id,
             dest,
@@ -228,14 +228,15 @@ export abstract class BaseClient<V = void> {
      * Sends a service response message to the specified service channel and destination
      * @param channel The channel object
      * @param id The service ID
-     * @param result The result of the service
+     * @param responseData The response data
      * @param dest The destination of the message
      */
-    sendServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, id: string, result: JSONValue, dest: string) {
+    sendServiceResponseMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, responseData: ServiceResponseType, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
-            responseData: result,
             serviceId: id,
-            dest
+            dest,
+            // If reponse data is undefined, don't send it (for services that don't return anything)
+            ...(responseData !== undefined ? { result: responseData } : {})
         }, "serviceResponse"), [dest]);
     }
 
@@ -311,7 +312,7 @@ export abstract class BaseClient<V = void> {
      * @param channel The channel object
      * @param handler The handler function to call when a service is requested
      */
-    srv<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, handler?: (topic: T) => U): void {
+    srv<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, handler?: (topic: T) => U): void {
         if (channel.mode !== "service") throw new Error("Channel is not a service channel");
         // Initialize channel
         const eventName = this.getChannelName(channel);
@@ -326,7 +327,7 @@ export abstract class BaseClient<V = void> {
      * Initializes a service channel with handlers
      * @param channel 
      */
-    protected initServiceChannel<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>) {
+    protected initServiceChannel<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
             this.channelSchemaMap.set(eventName, channel.schema);
@@ -378,7 +379,7 @@ export abstract class BaseClient<V = void> {
      * @param msg The message
      * @param sender Optional sender of the message (only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
-    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: V) {
+    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: V) {
         const resolver = this.serviceResolvers.get(msg.serviceId);
         const rejector = this.serviceRejectors.get(msg.serviceId);
         if (resolver === undefined || rejector === undefined) {
@@ -398,7 +399,7 @@ export abstract class BaseClient<V = void> {
      * @param msg The message
      * @param sender Optional sender of the message (only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
-    protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: V) {
+    protected onReceiveServiceMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: V) {
         // Get the handler
         const eventName = this.getChannelName(channel);
         const handler = this.serviceHandlerMap.get(eventName);
@@ -568,7 +569,7 @@ export abstract class BaseClient<V = void> {
      * @param timeout The timeout for the request (in ms)
      * @returns A promise that resolves with the response
      */
-    req<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number = 10000): Promise<U> {
+    req<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number = 10000): Promise<U> {
         this.initServiceChannel(channel);
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
@@ -588,7 +589,7 @@ export abstract class BaseClient<V = void> {
             }, timeout);
             // Add the promise to the map
             // console.log("Adding service promise", id);
-            this.serviceResolvers.set(id, (result: JSONValue) => {
+            this.serviceResolvers.set(id, (result: ServiceResponseType) => {
                 clearTimeout(timeoutId);
                 this.serviceResolvers.delete(id);
                 this.serviceRejectors.delete(id);
@@ -614,7 +615,7 @@ export abstract class BaseClient<V = void> {
      * @param dest The destination to send the request to
      * @param serviceID The service ID to use
      */
-    protected sendServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, serviceID: string) {
+    protected sendServiceMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, serviceID: string) {
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");
         }

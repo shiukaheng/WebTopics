@@ -194,4 +194,16 @@ describe("TopicServer tests", () => {
             done()
         })
     })
+    const testVoidService = createService("testVoid", z.object({
+        a: z.number()
+    }))
+    test("should be able to serve a service with void return type", (done) => {
+        impl.srv(testVoidService, (data) => {
+            expect(data.a).toBe(1)
+            done()
+        })
+        impl.req(testVoidService, {
+            a: 1
+        }, impl.id)
+    })
 })

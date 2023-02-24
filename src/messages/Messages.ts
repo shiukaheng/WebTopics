@@ -67,7 +67,7 @@ export type ServiceMessage = z.infer<typeof serviceMessageSchema>;
  * Message for a service response
  */
 export const serviceResponseMessageSchema = z.object({
-    responseData: jsonValueSchema,
+    responseData: jsonValueSchema.optional(),
     serviceId: z.string(),
     dest: z.string(), // A service is only possibly requested by one client
     noHandler: z.boolean().optional(),

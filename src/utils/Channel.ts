@@ -34,7 +34,9 @@ export const channelSchema = z.object({
     meta: z.boolean().optional(),
 });
 
-export type ServiceChannel<T extends JSONValue, U extends JSONValue> = Channel<T> & {
+export type ServiceResponseType = JSONValue | void;
+
+export type ServiceChannel<T extends JSONValue, U extends ServiceResponseType=void> = Channel<T> & {
     mode: "service";
     responseSchema: z.ZodSchema<U>;
 }
