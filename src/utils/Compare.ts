@@ -141,6 +141,10 @@ function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObj
         const result: RecursivePartial<T> = {} as RecursivePartial<T>;
         for (const key of Object.keys(deleteObject as object)) {
             (result as any)[key] = recursiveDelete((oldValue as any)[key], (deleteObject as any)[key]);
+            // If the result is undefined, delete the property
+            if ((result as any)[key] === undefined) {
+                delete (result as any)[key];
+            }
         }
         return result;
     }

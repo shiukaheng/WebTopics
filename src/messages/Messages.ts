@@ -28,7 +28,6 @@ export type MessageMeta = z.infer<typeof metaMessageSchema>;
  * - Server broadcasting to all clients -> Client needs to process the message and send a full topic message
  */
 export const requestFullTopicMessageSchema = z.object({
-    requestFullTopic: z.literal(true),
 });
 export type RequestFullTopicMessage = z.infer<typeof requestFullTopicMessageSchema>;
 

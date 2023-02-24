@@ -10,11 +10,18 @@ export function createTopic<T extends JSONValue>(name: string, schema: z.ZodSche
     }
 }
 
-export function createChannel<T extends JSONValue, R extends JSONValue>(name: string, requestSchema: z.ZodSchema<T>, responseSchema: z.ZodSchema<R>): ServiceChannel<T, R> {
+export function createService<T extends JSONValue, R extends JSONValue>(name: string, requestSchema: z.ZodSchema<T>, responseSchema: z.ZodSchema<R>): ServiceChannel<T, R> {
     return {
         mode: "service",
         name,
         schema: requestSchema,
         responseSchema
     }
+}
+
+export function makeChannelMeta<T>(channel: T): T & { meta: true } {
+    return {
+        ...channel,
+        meta: true
+    };
 }
