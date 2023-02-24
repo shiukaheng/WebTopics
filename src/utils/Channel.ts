@@ -5,10 +5,10 @@ export const channelModeSchema = z.union([
     z.literal("topic"),
     z.literal("service"),
 ]);
-
+export type RequestType = JSONValue | void;
 export type ChannelMode = z.infer<typeof channelModeSchema>;
 
-export type Channel<T extends JSONValue> = {
+export type Channel<T extends RequestType> = { // While the general channel type supports void, topic channels should not support void since it makes no sense to have a topic channel with no data
     /**
      * The name of the channel (prefixes will be added automatically, ensuring topic and service channels of the same name are unique)
      */
@@ -36,7 +36,7 @@ export const channelSchema = z.object({
 
 export type ServiceResponseType = JSONValue | void;
 
-export type ServiceChannel<T extends JSONValue, U extends ServiceResponseType=void> = Channel<T> & {
+export type ServiceChannel<T extends RequestType=void, U extends ServiceResponseType=void> = Channel<T> & {
     mode: "service";
     responseSchema: z.ZodSchema<U>;
 }

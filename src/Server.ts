@@ -3,7 +3,7 @@
 import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType } from "./BaseClient";
-import { Channel, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
+import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { JSONValue } from "./utils/JSON";
 import { TopicClient } from "./Client";
 
@@ -201,7 +201,7 @@ export class TopicServer extends BaseClient<IServerClient> {
      * @param senderSocket The socket of the sender
      * @param dest The destination clients
      */
-    protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: IServerClient, dest: DestType = "*"): void {
+    protected relay<T extends RequestType, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: IServerClient, dest: DestType = "*"): void {
         if (dest === "*") {
             // Broadcast to all sockets
             senderSocket.broadcast.emit(this.getChannelName(channel), msg);
@@ -257,7 +257,7 @@ export class TopicServer extends BaseClient<IServerClient> {
      * @param msg The message received
      * @param sender The socket of the sender
      */
-    protected onReceiveServiceMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: IServerClient): void {
+    protected onReceiveServiceMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === "*" || msg.dest.includes(this.id)) {
             super.onReceiveServiceMessage(channel, msg, sender);
@@ -274,7 +274,7 @@ export class TopicServer extends BaseClient<IServerClient> {
      * @param msg The message received
      * @param sender The socket of the sender
      */
-    protected onReceiveServiceResponseMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: IServerClient): void {
+    protected onReceiveServiceResponseMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === this.id) {
             super.onReceiveServiceResponseMessage(channel, msg, sender);

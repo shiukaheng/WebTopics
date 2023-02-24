@@ -54,7 +54,7 @@ export type TopicMessage = z.infer<typeof topicMessageSchema>;
  * Message for a service
  */
 export const serviceMessageSchema = z.object({
-    serviceData: jsonValueSchema,
+    serviceData: jsonValueSchema.optional(),
     serviceId: z.string(), // For matching up responses,
     dest: z.union([
         z.array(z.string()),
@@ -70,6 +70,7 @@ export const serviceResponseMessageSchema = z.object({
     responseData: jsonValueSchema.optional(),
     serviceId: z.string(),
     dest: z.string(), // A service is only possibly requested by one client
+    errorMessage: z.string().optional(),
     noHandler: z.boolean().optional(),
 });
 export type ServiceResponseMessage = z.infer<typeof serviceResponseMessageSchema>;

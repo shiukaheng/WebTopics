@@ -186,10 +186,10 @@ describe("TopicServer tests", () => {
         impl.srv(testService, (data) => {
             return data.a + data.b
         })
-        impl.req(testService, {
+        impl.req(testService, impl.id,{
             a: 1,
             b: 2
-        }, impl.id).then((data) => {
+        }).then((data) => {
             expect(data).toBe(3)
             done()
         })
@@ -201,10 +201,57 @@ describe("TopicServer tests", () => {
         impl.srv(testVoidService, (data) => {
             expect(data.a).toBe(1)
         })
-        impl.req(testVoidService, {
+        impl.req(testVoidService, impl.id, {
             a: 1
-        }, impl.id).then((data) => {
+        }).then((data) => {
             expect(data).toBeUndefined()
+            done()
+        })
+    })
+    const testDoubleVoidService = createService("testDoubleVoid")
+    test("should be able to serve a service with void return type and void input type", (done) => {
+        impl.srv(testDoubleVoidService, (data) => {
+            expect(data).toBeUndefined()
+        })
+        impl.req(testDoubleVoidService, impl.id).then((data) => {
+            expect(data).toBeUndefined()
+            done()
+        })
+    })
+    const testAsyncService = createService("testAsync", z.number(), z.number())
+    test("should be able to serve a service with a async function", (done) => {
+        impl.srv(testAsyncService, async (data) => {
+            // Set 5ms timeout to simulate async
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(data + 1)
+                }, 5)
+            })
+        })
+        impl.req(testAsyncService, impl.id, 1).then((data) => {
+            expect(data).toBe(2)
+            done()
+        })
+    })
+    const testAsyncTimeoutService = createService("testAsyncTimeout", z.number(), z.number())
+    test("should return a client-side timeout error if a service takes too long to respond", (done) => {
+        const timeNow = Date.now()
+        console.log("Testing timeout")
+        impl.srv(testAsyncTimeoutService, async (data) => {
+            // Set 10 second timeout to simulate long async
+            return await new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(data + 1)
+                }, 10000)
+            })
+        })
+        impl.req(testAsyncTimeoutService, impl.id, 1).then((data) => { // Defaults to 100ms timeout
+            console.log("This should not be called")
+        }).catch((err) => {
+            // Log time taken
+            console.log("Time taken: " + (Date.now() - timeNow))
+            expect(err).toBeInstanceOf(Error)
+            console.log(err)
             done()
         })
     })
