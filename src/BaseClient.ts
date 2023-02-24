@@ -228,15 +228,15 @@ export abstract class BaseClient<V = void> {
      * Sends a service response message to the specified service channel and destination
      * @param channel The channel object
      * @param id The service ID
-     * @param responseData The response data
+     * @param result The response data
      * @param dest The destination of the message
      */
-    sendServiceResponseMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, responseData: ServiceResponseType, dest: string) {
+    sendServiceResponseMessage<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, result: ServiceResponseType, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             serviceId: id,
             dest,
             // If reponse data is undefined, don't send it (for services that don't return anything)
-            ...(responseData !== undefined ? { result: responseData } : {})
+            ...(result !== undefined ? { responseData: result } : {})
         }, "serviceResponse"), [dest]);
     }
 
@@ -385,6 +385,14 @@ export abstract class BaseClient<V = void> {
         if (resolver === undefined || rejector === undefined) {
             console.warn("No resolver or rejector for service id: ", msg.serviceId, ", perhaps the service timed out?");
             return;
+        }
+        // Verify response schema
+        if (channel.responseSchema !== undefined) {
+            const validResponse = channel.responseSchema.safeParse(msg.responseData).success;
+            if (!validResponse) {
+                rejector(new Error(`Invalid response schema for service ${channel.name}: ${JSON.stringify(msg)}`));
+                return;
+            }
         }
         if (msg.noHandler) {
             rejector(new Error("No service handler"));

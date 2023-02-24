@@ -200,10 +200,12 @@ describe("TopicServer tests", () => {
     test("should be able to serve a service with void return type", (done) => {
         impl.srv(testVoidService, (data) => {
             expect(data.a).toBe(1)
-            done()
         })
         impl.req(testVoidService, {
             a: 1
-        }, impl.id)
+        }, impl.id).then((data) => {
+            expect(data).toBeUndefined()
+            done()
+        })
     })
 })
