@@ -54,7 +54,7 @@ export type TopicMessage = z.infer<typeof topicMessageSchema>;
  * Message for a service
  */
 export const serviceMessageSchema = z.object({
-    serviceData: jsonValueSchema,
+    serviceData: jsonValueSchema.optional(),
     serviceId: z.string(), // For matching up responses,
     dest: z.union([
         z.array(z.string()),

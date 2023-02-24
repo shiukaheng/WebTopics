@@ -208,4 +208,14 @@ describe("TopicServer tests", () => {
             done()
         })
     })
+    const testDoubleVoidService = createService("testDoubleVoid")
+    test("should be able to serve a service with void return type and void input type", (done) => {
+        impl.srv(testDoubleVoidService, (data) => {
+            expect(data).toBeUndefined()
+        })
+        impl.req(testDoubleVoidService, undefined, impl.id).then((data) => {
+            expect(data).toBeUndefined()
+            done()
+        })
+    })
 })
