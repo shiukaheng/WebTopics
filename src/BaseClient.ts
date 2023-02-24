@@ -725,6 +725,12 @@ export abstract class BaseClient<V = void> {
         }
     }
 
+    // TODO:
+    // - listClientsSync
+    // - listClients
+    // - listServicesSync
+    // - listServices
+
     // TODO: We need a way to unsubscribe from a topic soon, but for now we can just use this. This will leak memory if we repeatedly call it.
     /**
      * Gets a promise that resolves with the server ID
