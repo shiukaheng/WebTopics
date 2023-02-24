@@ -9,9 +9,21 @@ export const channelModeSchema = z.union([
 export type ChannelMode = z.infer<typeof channelModeSchema>;
 
 export type Channel<T extends JSONValue> = {
+    /**
+     * The name of the channel (prefixes will be added automatically, ensuring topic and service channels of the same name are unique)
+     */
     name: string;
+    /**
+     * The mode of the channel
+     */
     mode: ChannelMode;
+    /**
+     * The schema of the channel
+     */
     schema: z.ZodSchema<T>;
+    /**
+     * Whether the channel is a meta channel (not meant to be used by the user)
+     */
     meta?: boolean;
 }
 

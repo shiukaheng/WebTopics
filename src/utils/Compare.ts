@@ -3,8 +3,9 @@ import { JSONObject, JSONValue } from './JSON';
 
 type Primitive<U> = string | number | boolean | null | Array<U>;
 
-// RecursiveNull - makes all properties of an object null recursively, 
-// except for array properties, which will be replaced by one null element
+/**
+ * Makes all properties of an object null recursively, except for array properties, which will be replaced by one null element
+ */
 export type RecursiveNull<T> =
     // If T is a primitive, return null
     T extends Primitive<infer U> ? null :
@@ -13,7 +14,9 @@ export type RecursiveNull<T> =
     // If T is anything else, remove it
     never;
 
-// RecursivePartial - makes all properties of the type optional recursively
+/**
+ * Makes all properties of the type optional recursively
+ */
 export type RecursivePartial<T> =
     // If T is a primitive, make it optional
     T extends Primitive<infer U> ? T | undefined :
@@ -22,15 +25,31 @@ export type RecursivePartial<T> =
     // If T is anything else, remove it
     never;
 
-// DiffResult - the result of a diff operation showing whats modified (including new properties), and whats deleted
+/**
+ * The result of a diff operation showing whats modified (including new properties), and whats deleted
+ */
 export type DiffResult<T extends JSONValue, U extends JSONValue> = {
     // Allow modified to be a union of the two types, since we can add new properties
+    /**
+     * Partial of the new value, with only the modified properties
+     */
     modified?: RecursivePartial<T & U>; // This only does intersection on the top level, but its a limitation of typescript
+    /**
+     * Null values for where properties should be deleted
+     */
     deleted?: RecursivePartial<RecursiveNull<T>>;
 };
 
+/**
+ * The type of a value in strings; primitive here includes arrays since we treat them as an atomic value
+ */
 type ValueType = 'primitive' | 'object' | 'undefined';
 
+/**
+ * Returns the type of a value
+ * @param value The value to get the type of
+ * @returns The type of the value
+ */
 function valueType(value: any): ValueType {
     if (Array.isArray(value) || value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return 'primitive';
@@ -44,6 +63,9 @@ function valueType(value: any): ValueType {
     throw new Error(`Unknown value type: ${value}`);
 }
 
+/**
+ * Compares two primitive values, including arrays using lodash isEqual 
+ */
 function primitiveEqual(a: JSONValue, b: JSONValue): boolean {
     // If array, use lodash isEqual
     if (Array.isArray(a) && Array.isArray(b)) {
@@ -54,6 +76,9 @@ function primitiveEqual(a: JSONValue, b: JSONValue): boolean {
     }
 }
 
+/**
+ * Compares two JSON values and returns the difference between them
+ */
 export function diff<T extends JSONValue, U extends JSONValue>(oldValue: T, newValue: U): DiffResult<T, U> {
     const oldValueType = valueType(oldValue);
     const newValueType = valueType(newValue);
@@ -120,6 +145,10 @@ export function diff<T extends JSONValue, U extends JSONValue>(oldValue: T, newV
 }
 
 // A valid Diff should not have a property in both modified and deleted, but our function will be lenient and allow it by applying deleted first, then modified
+
+/**
+ * Merges a diff result into an old value to get a new value
+ */
 export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T | undefined, diff: DiffResult<T, U>): any {
     // @ts-ignore - temporary fix for type bug
     const deleted = recursiveDelete(oldValue, diff.deleted);
@@ -127,6 +156,9 @@ export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T 
     return modified;
 }
 
+/**
+ * Recursively deletes properties from an object in place with a delete object in the diff format
+ */
 function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T | undefined> {
     // Get the type of the old value
     const deleteObjectType = valueType(deleteObject);
@@ -150,6 +182,9 @@ function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObj
     }
 }
 
+/**
+ * Recursively merges two objects in place with a merge object in the diff format
+ */
 function recursiveMerge<T extends JSONValue, U extends JSONValue>(oldValue: T | undefined, mergeObject: RecursivePartial<T & U>): RecursivePartial<T & U> {
     // Get the type of the old value
     const oldValueType = valueType(oldValue);

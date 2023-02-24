@@ -45,18 +45,58 @@ export type Unsubscriber = () => void;
  * Base class for {@link TopicClient} and {@link TopicServer} classes, responsible for keeping track of topics and services, and sending and receiving messages
  */
 export abstract class BaseClient<V = void> {
+    /**
+     * Map of channel names to their schemas (both topic and service)
+     */
     protected channelSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
+    /**
+     * Map of service channel names to their response schemas
+     */
     protected channelResponseSchemaMap: Map<string, z.ZodSchema<JSONValue>> = new Map();
+    /**
+     * Map of topic channel names to a list of change handlers 
+     */
     protected topicHandlerMap: Map<string, ((value: JSONValue, diff?: DiffResult<JSONValue, JSONValue>) => void)[]> = new Map();
+    /**
+     * Map of topic channel names to their current values
+     */
     protected topicMap: Map<string, JSONValue> = new Map(); // Not guaranteed to be complete, need validation on each update
+    /**
+     * Map of topic channel names to whether they are valid according to the schema
+     */
     protected topicsValid: Map<string, boolean> = new Map();
+    /**
+     * Map of service channel names to their handlers
+     */
     protected serviceHandlerMap: Map<string, (data: JSONValue) => JSONValue> = new Map();
+    /**
+     * Internal ID of the client, not to be directly used; use the getter instead
+     */
     protected _id: string;
+    /**
+     * Map of open service request IDs to their resolvers
+     */
     protected serviceResolvers: Map<string, (data: JSONValue) => void> = new Map();
+    /**
+     * Map of open service request IDs to their rejectors
+     */
     protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
 
     // Abstract methods
+
+    /**
+     * Abstract method for subscribing to a raw socket event
+     * @param event The event name
+     * @param listener The listener function
+     */
     protected abstract onRawEvent(event: string, listener: (data: any, sender?: V) => void): void; // On an event, with the option to specify the sender (for differentiating where the message came from), but only used optionally per implementation
+    
+    /**
+     * Abstract method for emitting a raw socket event
+     * @param event The event name
+     * @param data The data to send
+     * @param destination The destination of the event
+     */
     protected abstract emitRawEvent(event: string, data: any, destination: DestType): void;
 
     // Default constructor
