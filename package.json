@@ -8,7 +8,10 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "rimraf ./build && tsc",
     "build-docs": "typedoc",
-    "start": "npm run build && node ./build/index.js"
+    "start": "npm run build && node ./build/index.js",
+    "pub:patch": "jest && npm run build && npm run build-docs && npm version patch && npm publish",
+    "pub:minor": "jest && npm run build && npm run build-docs && npm version minor && npm publish",
+    "pub:major": "jest && npm run build && npm run build-docs && npm version major && npm publish"
   },
   "author": "",
   "license": "ISC",
