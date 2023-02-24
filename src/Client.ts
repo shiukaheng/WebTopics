@@ -1,7 +1,7 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
 import { io, Socket } from "socket.io-client";
-import { BaseClient} from "./BaseClient";
+import { BaseClient } from "./BaseClient";
 
 
 export interface IClient {

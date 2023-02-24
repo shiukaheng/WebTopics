@@ -2,7 +2,7 @@
 
 import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
-import { BaseClient, channelPrefix, DestType} from "./BaseClient";
+import { BaseClient, channelPrefix, DestType } from "./BaseClient";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
 import { JSONValue } from "./utils/JSON";
 
@@ -207,7 +207,7 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     }
 
-    initChannels(channels: Array<TopicChannel<any>|ServiceChannel<any, any>>): void {
+    initChannels(channels: Array<TopicChannel<any> | ServiceChannel<any, any>>): void {
         channels.forEach((channel) => {
             // If channel is a topic channel, run initTopicChannel
             if (channel.mode === "topic") {
