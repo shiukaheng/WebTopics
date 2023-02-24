@@ -206,7 +206,6 @@ export abstract class BaseClient<V = void> {
      * @param source The source of the message (optional and defaults to the current client, only used in {@link TopicServer})
      */
     protected sendRequestFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
-        // console.log(`Client ${this.id} sending request full topic for channel ${channel.name}`)
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullTopic", source), "*");
     }
 
@@ -266,7 +265,6 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
         this.initTopicChannel<T>(channel);
         const eventName = this.getChannelName(channel);
-        this.channelSchemaMap.set(eventName, channel.schema);
         if (handler !== undefined) {
             this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
         }
@@ -295,6 +293,7 @@ export abstract class BaseClient<V = void> {
     protected initTopicChannel<T extends JSONValue>(channel: TopicChannel<T>) {
         const eventName = this.getChannelName(channel);
         if (!this.channelSchemaMap.has(eventName)) { // Initialize channel if not already initialized
+            this.channelSchemaMap.set(eventName, channel.schema);
             this.topicMap.set(eventName, {});
             if (this.topicHandlerMap.has(eventName) === false) {
                 this.topicHandlerMap.set(eventName, []);

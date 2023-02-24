@@ -1,6 +1,6 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
-import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage } from "./messages/Messages";
+import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage, RequestFullTopicMessage } from "./messages/Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType } from "./BaseClient";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
@@ -245,11 +245,11 @@ export class TopicServer extends BaseClient<IServerClient> {
     }
 
     // Server should always know the full topic, so this is not needed:
-    // protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender: Socket): void {
-    //     super.onReceiveRequestFullTopicMessage(channel, msg, sender);
-    //     // TODO: Forwards request full topic message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
-    //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
-    // };
+    protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender?: IServerClient): void {
+        // super.onReceiveRequestFullTopicMessage(channel, msg, sender);
+        // TODO: Forwards request full topic message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
+        // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
+    };
 
     /**
      * Handle a service message received from a client, only handling if server is a recipient, otherwise forwarding to destination
