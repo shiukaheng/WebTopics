@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
+import { TopicServer } from "./Server";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./utils/Compare";
 import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "./messages/Messages";
 import { JSONObject, JSONValue } from "./utils/JSON";
@@ -455,6 +456,31 @@ export abstract class BaseClient<V = void> {
         }
     }
 
+    _set<T extends JSONValue>(channel: Channel<T>, data: RecursivePartial<T>, updateSelf: boolean = true, deleteDeletes: boolean = false, source?: string): void {
+        const eventName = this.getChannelName(channel);
+        const currentTopic = this.topicMap.get(eventName);
+        if (currentTopic === undefined) {
+            throw new Error("Channel not found");
+        }
+        const diffResult = diff(currentTopic as T, data as JSONValue);
+        // Disallow deletions of topic properties
+        if (!deleteDeletes) {
+            diffResult.deleted = undefined;
+        }
+        // Only emit if there are changes
+        if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
+            // Apply the changes to the topic
+            const newTopic = mergeDiff(currentTopic, diffResult);
+            this.topicMap.set(eventName, newTopic);
+            this.sendDiffTopic(channel as TopicChannel<T>, diffResult as DiffResult<T, T>, source); 
+            if (updateSelf) {
+                // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+                // Send yourself the message, so that it runs through the same logic as if it was received from another client
+                this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this._id) as WithMeta<TopicMessage>)
+            }
+        }
+    }
+
     /**
      * Publishes a new value to a topic channel by broadcasting the diff between the current value and the new value
      * @param channel The channel to publish to
@@ -463,11 +489,12 @@ export abstract class BaseClient<V = void> {
      * @param publishDeletes Whether to publish deletions of topic properties (not recommended if multiple clients are publishing to the same topic with overlapping properties)
      * @param source Optional source of the update (Only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
-    pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf?: boolean, publishDeletes: boolean = true, source?: string,): void {
+    pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf: boolean=true, publishDeletes: boolean=true, source?: string): void {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
         this.initTopicChannel(channel);
+
         const eventName = this.getChannelName(channel);
         const currentTopic = this.topicMap.get(eventName);
         if (currentTopic === undefined) {
@@ -483,7 +510,7 @@ export abstract class BaseClient<V = void> {
             // Apply the changes to the topic
             const newTopic = mergeDiff(currentTopic, diffResult);
             this.topicMap.set(eventName, newTopic);
-            this.sendDiffTopic(channel as TopicChannel<T>, diffResult as DiffResult<T, T>, source);
+            this.sendDiffTopic(channel as TopicChannel<T>, diffResult as DiffResult<T, T>, source); 
             if (updateSelf) {
                 // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
                 // Send yourself the message, so that it runs through the same logic as if it was received from another client
@@ -491,6 +518,7 @@ export abstract class BaseClient<V = void> {
             }
         }
     }
+
 
     /**
      * Sends a service request to the specified destination
