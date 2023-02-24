@@ -68,8 +68,6 @@ export class TopicServer extends BaseClient<IServerClient> {
                     console.warn("Client disconnected, but no matching client ID found");
                 }
             });
-            // Send server ID to client
-            socket.emit("id", this._id);
             // Add client to server meta
         });
         this.onRawEvent("id", (data: any, sender?: IServerClient) => {
