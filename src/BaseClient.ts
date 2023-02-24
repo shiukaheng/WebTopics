@@ -577,7 +577,8 @@ export abstract class BaseClient<V = void> {
      * @param timeout The timeout for the request (in ms)
      * @returns A promise that resolves with the response
      */
-    req<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, serviceData: T, dest: string, timeout: number = 10000): Promise<U> {
+    req<T extends RequestType, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, dest: string, serviceData?: T, timeout?: number): Promise<U>;
+    req<T extends JSONValue, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, dest: string, serviceData: T, timeout: number = 10000): Promise<U> {
         this.initServiceChannel(channel);
         if (channel.mode !== "service") {
             throw new Error("Channel is not a service channel");

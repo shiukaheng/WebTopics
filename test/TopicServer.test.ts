@@ -186,10 +186,10 @@ describe("TopicServer tests", () => {
         impl.srv(testService, (data) => {
             return data.a + data.b
         })
-        impl.req(testService, {
+        impl.req(testService, impl.id,{
             a: 1,
             b: 2
-        }, impl.id).then((data) => {
+        }).then((data) => {
             expect(data).toBe(3)
             done()
         })
@@ -201,9 +201,9 @@ describe("TopicServer tests", () => {
         impl.srv(testVoidService, (data) => {
             expect(data.a).toBe(1)
         })
-        impl.req(testVoidService, {
+        impl.req(testVoidService, impl.id, {
             a: 1
-        }, impl.id).then((data) => {
+        }).then((data) => {
             expect(data).toBeUndefined()
             done()
         })
@@ -213,7 +213,7 @@ describe("TopicServer tests", () => {
         impl.srv(testDoubleVoidService, (data) => {
             expect(data).toBeUndefined()
         })
-        impl.req(testDoubleVoidService, undefined, impl.id).then((data) => {
+        impl.req(testDoubleVoidService, impl.id).then((data) => {
             expect(data).toBeUndefined()
             done()
         })

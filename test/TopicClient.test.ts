@@ -208,11 +208,37 @@ describe("TopicClient tests", () => {
         topicClient.srv(testService, (data) => {
             return data.a + data.b
         })
-        topicClient.req(testService, {
+        topicClient.req(testService, topicClient.id, {
             a: 1,
             b: 2
-        }, topicClient.id).then((data) => {
+        }).then((data) => {
             expect(data).toBe(3)
+            done()
+        })
+    })
+    const testVoidService = createService("testVoid", z.object({
+        a: z.number()
+    }))
+    topicServer.initChannels([testVoidService])
+    test("should be able to serve a service with void return type", (done) => {
+        topicClient.srv(testVoidService, (data) => {
+            expect(data.a).toBe(1)
+        })
+        topicClient.req(testVoidService, topicClient.id, {
+            a: 1
+        }).then((data) => {
+            expect(data).toBeUndefined()
+            done()
+        })
+    })
+    const testDoubleVoidService = createService("testDoubleVoid")
+    topicServer.initChannels([testDoubleVoidService])
+    test("should be able to serve a service with void return type and void input type", (done) => {
+        topicClient.srv(testDoubleVoidService, (data) => {
+            expect(data).toBeUndefined()
+        })
+        topicClient.req(testDoubleVoidService, topicClient.id).then((data) => {
+            expect(data).toBeUndefined()
             done()
         })
     })
