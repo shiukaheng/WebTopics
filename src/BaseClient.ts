@@ -176,7 +176,7 @@ export abstract class BaseClient<V = void> {
      * @param diff The diff to send
      * @param source The source of the message
      */
-    sendDiffTopic<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
+    protected sendDiffTopic<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage(diff as JSONObject, "topic", source), "*");
     }
 
@@ -185,7 +185,7 @@ export abstract class BaseClient<V = void> {
      * @param channel The channel object
      * @param source The source of the message (optional and defaults to the current client, only used in {@link TopicServer})
      */
-    sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
+    protected sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
         // console.log(`Client ${this.id} sending full topic for channel ${channel.name}`)
         // Try to get full topic from channel
         const fullTopic = this._getUnsafeTopic(channel);
@@ -205,7 +205,7 @@ export abstract class BaseClient<V = void> {
      * @param channel The channel object
      * @param source The source of the message (optional and defaults to the current client, only used in {@link TopicServer})
      */
-    sendRequestFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
+    protected sendRequestFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
         // console.log(`Client ${this.id} sending request full topic for channel ${channel.name}`)
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({}, "requestFullTopic", source), "*");
     }
@@ -216,7 +216,7 @@ export abstract class BaseClient<V = void> {
      * @param id The service ID
      * @param dest The destination of the message
      */
-    sendNoServiceHandlerMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, dest: string) {
+    protected sendNoServiceHandlerMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             serviceId: id,
             dest,
@@ -231,7 +231,7 @@ export abstract class BaseClient<V = void> {
      * @param result The response data
      * @param dest The destination of the message
      */
-    sendServiceResponseMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, result: ServiceResponseType, dest: string) {
+    protected sendServiceResponseMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, result: ServiceResponseType, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             serviceId: id,
             dest,
@@ -247,7 +247,7 @@ export abstract class BaseClient<V = void> {
      * @param errorMesssage The error message
      * @param dest The destination of the message
      */
-    sendServiceErrorMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, errorMesssage: string, dest: string) {
+    protected sendServiceErrorMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, errorMesssage: string, dest: string) {
         this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
             serviceId: id,
             dest,
@@ -271,7 +271,7 @@ export abstract class BaseClient<V = void> {
             this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
         }
         if (initialUpdate && this.hasValidTopic(channel)) {
-            handler?.(this.getTopic(channel));
+            handler?.(this.getTopicSync(channel));
         }
         const unsubscriber = () => {
             // Remove handler from handler map
@@ -538,31 +538,6 @@ export abstract class BaseClient<V = void> {
         }
     }
 
-    _set<T extends JSONValue>(channel: Channel<T>, data: RecursivePartial<T>, updateSelf: boolean = true, deleteDeletes: boolean = false, source?: string): void {
-        const eventName = this.getChannelName(channel);
-        const currentTopic = this.topicMap.get(eventName);
-        if (currentTopic === undefined) {
-            throw new Error("Channel not found");
-        }
-        const diffResult = diff(currentTopic as T, data as JSONValue);
-        // Disallow deletions of topic properties
-        if (!deleteDeletes) {
-            diffResult.deleted = undefined;
-        }
-        // Only emit if there are changes
-        if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
-            // Apply the changes to the topic
-            const newTopic = mergeDiff(currentTopic, diffResult);
-            this.topicMap.set(eventName, newTopic);
-            this.sendDiffTopic(channel as TopicChannel<T>, diffResult as DiffResult<T, T>, source); 
-            if (updateSelf) {
-                // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
-                // Send yourself the message, so that it runs through the same logic as if it was received from another client
-                this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this._id) as WithMeta<TopicMessage>)
-            }
-        }
-    }
-
     /**
      * Publishes a new value to a topic channel by broadcasting the diff between the current value and the new value
      * @param channel The channel to publish to
@@ -694,7 +669,7 @@ export abstract class BaseClient<V = void> {
      * @returns The current value of the topic channel
      * @throws Error if the channel is not a topic channel, not found, or not valid
      */
-    getTopic<T extends JSONValue>(channel: TopicChannel<T>): T {
+    getTopicSync<T extends JSONValue>(channel: TopicChannel<T>): T {
         const channelName = this.getChannelName(channel);
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
@@ -710,13 +685,35 @@ export abstract class BaseClient<V = void> {
     }
 
     /**
+     * Gets a promise that resolves with a topic channel's value (waits for a value before resolving)
+     * @param channel The channel to get the value of
+     * @param timeout The timeout for the request (in ms)
+     * @returns A promise that resolves with the topic channel's value
+     */
+    getTopic<T extends JSONValue>(channel: TopicChannel<T>, timeout: number=100): Promise<T> {
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                reject(new Error("Topic timed out"));
+            }, timeout);
+            var timedOut = false;
+            const unsub = this.sub(channel, (topic) => {
+                if (!timedOut) {
+                    clearTimeout(timeoutId);
+                    resolve(topic);
+                }
+                unsub();
+            });
+        });
+    }
+
+    /**
      * Lists all clients connected to the server
      * @returns An array of client IDs
      */
     listClients(): string[] {
         // Read off of serverMetaChannel
         try {
-            const serverMeta = this.getTopic(serverMetaChannel);
+            const serverMeta = this.getTopicSync(serverMetaChannel);
             if (serverMeta.clients === undefined) {
                 return [];
             } else {
