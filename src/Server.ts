@@ -5,7 +5,11 @@ import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType } from "./BaseClient";
 import { Channel, ServiceChannel, TopicChannel } from "./utils/Channel";
 import { JSONValue } from "./utils/JSON";
+import { TopicClient } from "./Client";
 
+/**
+ * Server client interface; this is the interface that the server uses to directly communicate with the client
+ */
 export interface IServerClient {
     disconnect(): void;
     id: string;
@@ -17,6 +21,9 @@ export interface IServerClient {
     on: (event: string, listener: (data: any) => void) => void;
 }
 
+/**
+ * Server interface for listening and emitting events
+ */
 export interface IServer {
     on: (event: string, listener: (socket: IServerClient) => void) => void;
     emit: (event: string, data: any) => void;
@@ -25,18 +32,47 @@ export interface IServer {
 // TODO: Block spoofed messages
 // TODO: Server responses are currently broadcasted. We should probably add destination IDs to emitRawEvent and only send to those clients
 
+/**
+ * Server class to host topic and service channels for {@link TopicClient} instances to connect to
+ */
 export class TopicServer extends BaseClient<IServerClient> {
+    /**
+     * Map between socket IDs and {@link IServerClient} instances
+     */
     private clientSockets: Map<string, IServerClient>;
+    /**
+     * Raw handlers for socket events
+     */
     private channelHandlers: Map<string, (data: any, sender?: IServerClient) => void>;
+    /**
+     * The socket server instance
+     */
     private socket: IServer;
+    /**
+     * Map between socket IDs and {@link TopicClient} IDs
+     */
     private socketToClientID: Map<string, string> = new Map();
+    /**
+     * Map between {@link TopicClient} IDs and socket IDs
+     */
     private clientToSocketID: Map<string, string> = new Map(); // Two way map for O(1) lookup on both sides
+    /**
+     * Internal server meta data for storing clients connected, and the services they provide
+     */
     private clientMeta: ServerMeta = {
         serverID: this._id,
         clients: { // Server will fill in itself too, so no need to add it here
         }
     };
-    static metaChannels = ["id"]; // Extra channels the server handles with onRawEvent
+    /**
+     * Extra channels the server handles with onRawEvent that are not topic or service channels
+     */
+    static metaChannels = ["id"]; // "id" channel is used to match socket IDs with client IDs. Clients will send their ID to the server on connect, and the server will match it with the socket ID.
+    
+    /**
+     * Creates a new TopicServer instance
+     * @param server The socket server instance
+     */
     constructor(server: IServer) {
         super();
         this.socket = server;
@@ -87,6 +123,9 @@ export class TopicServer extends BaseClient<IServerClient> {
             }
         });
     }
+    /**
+     * Initialize the server by linking {@link TopicServer.clientMeta} to the server meta channel, and calling {@link BaseClient.initialize}
+     */
     protected initialize(): void {
         this.sub(serverMetaChannel, (data: ServerMeta) => {
             this.clientMeta = data;
@@ -95,9 +134,20 @@ export class TopicServer extends BaseClient<IServerClient> {
         super.initialize(); // Initialize afterwards, so we publish server ID first, so the subscription doesnt overwrite client meta (and its server ID)
     }
     // General listener for event on all clients
+    /**
+     * Add a listener for a raw event on all clients
+     * @param event The event name
+     * @param listener The listener function
+     */
     protected onRawEvent(event: string, listener: (data: any, sender?: IServerClient) => void): void {
         this.channelHandlers.set(event, listener);
     }
+    /**
+     * Emit a raw event to all clients
+     * @param event The event name 
+     * @param data The data to send
+     * @param dest The destination clients. "*" for all clients, or an array of client IDs
+     */
     protected emitRawEvent(event: string, data: any, dest: DestType): void {
         if (dest === "*") {
             // Broadcast to all sockets
@@ -119,6 +169,11 @@ export class TopicServer extends BaseClient<IServerClient> {
             }
         }
     }
+    /**
+     * Get all {@link IServerClient} sockets from a list of {@link TopicClient} IDs
+     * @param dest The list of client IDs
+     * @returns An array of {@link IServerClient} sockets
+     */
     private getSockets(dest: string[]) {
         let sockets: IServerClient[] = [];
         for (const clientID of dest) {
@@ -139,6 +194,13 @@ export class TopicServer extends BaseClient<IServerClient> {
         return sockets;
     }
 
+    /**
+     * Relays a message to destination clients
+     * @param channel The channel to relay the message on
+     * @param msg The message to relay
+     * @param senderSocket The socket of the sender
+     * @param dest The destination clients
+     */
     protected relay<T extends JSONValue, U extends MessageMeta>(channel: Channel<T>, msg: U, senderSocket: IServerClient, dest: DestType = "*"): void {
         if (dest === "*") {
             // Broadcast to all sockets
@@ -168,6 +230,12 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     }
 
+    /**
+     * Handle a message received from a client
+     * @param channel The channel the message was received on
+     * @param msg The message received
+     * @param sender The socket of the sender
+     */
     protected onReceiveTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<TopicMessage>, sender?: IServerClient): void {
         super.onReceiveTopicMessage(channel, msg, sender);
         // TODO: Forwards topic message to all clients except sender
@@ -183,6 +251,12 @@ export class TopicServer extends BaseClient<IServerClient> {
     //     // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
     // };
 
+    /**
+     * Handle a service message received from a client, only handling if server is a recipient, otherwise forwarding to destination
+     * @param channel The channel the message was received on
+     * @param msg The message received
+     * @param sender The socket of the sender
+     */
     protected onReceiveServiceMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === "*" || msg.dest.includes(this.id)) {
@@ -194,6 +268,12 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     }
 
+    /**
+     * Handle a service response message received from a client, only handling if server is a recipient, otherwise forwarding to destination
+     * @param channel The channel the message was received on
+     * @param msg The message received
+     * @param sender The socket of the sender
+     */
     protected onReceiveServiceResponseMessage<T extends JSONValue, U extends JSONValue>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: IServerClient): void {
         // Skip if server not a recipient
         if (msg.dest === this.id) {
@@ -205,6 +285,10 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     }
 
+    /**
+     * Convenience method to initialize an array of channels so the server will handle them
+     * @param channels The array of channels to initialize
+     */
     initChannels(channels: Array<TopicChannel<any> | ServiceChannel<any, any>>): void {
         channels.forEach((channel) => {
             // If channel is a topic channel, run initTopicChannel
