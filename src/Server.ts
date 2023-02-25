@@ -29,6 +29,19 @@ export interface IServer {
     emit: (event: string, data: any) => void;
 }
 
+export interface IServerOptions {
+    /**
+     * Whether to log all topic messages
+     * @default false
+     */
+    logTopics: boolean;
+    /**
+     * Whether to log all service messages
+     * @default false
+     */
+    logServices: boolean;
+}
+
 // TODO: Block spoofed messages
 // TODO: Server responses are currently broadcasted. We should probably add destination IDs to emitRawEvent and only send to those clients
 
@@ -65,17 +78,28 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     };
     /**
+     * Server options
+     */
+    private options: IServerOptions = {
+        logTopics: false,
+        logServices: false
+    };
+    /**
      * Extra channels the server handles with onRawEvent that are not topic or service channels
      */
     static metaChannels = ["id"]; // "id" channel is used to match socket IDs with client IDs. Clients will send their ID to the server on connect, and the server will match it with the socket ID.
-    
+
     /**
      * Creates a new TopicServer instance
      * @param server The socket server instance
      */
-    constructor(server: IServer) {
+    constructor(server: IServer, options?: Partial<IServerOptions>) {
         super();
         this.socket = server;
+        this.options = {
+            ...this.options,
+            ...options
+        }
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
         this.initialize();
@@ -241,7 +265,23 @@ export class TopicServer extends BaseClient<IServerClient> {
         // TODO: Forwards topic message to all clients except sender
         if (sender !== undefined) { // When sender is undefined, it is the server itself
             sender.broadcast.emit(this.getChannelName(channel), msg);
+            if (this.options.logTopics) {
+                console.log(`📡 Received topic message on ${channel} from ${msg.source} and forwarded to all clients except sender`);
+            }
+        } else {
+            if (this.options.logTopics) {
+                console.log(`📬 Received topic from self on ${channel}`);
+            }
         }
+    }
+
+    protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<{}>, sender?: IServerClient | undefined): void {
+        if (sender !== undefined) {
+            console.log(`📡 Received request full topic message on ${channel} from ${msg.source} and forwarded to all clients`);
+        } else {
+            console.log(`📬 Received request full topic from self on ${channel}`);
+        }
+        super.onReceiveRequestFullTopicMessage(channel, msg, sender);
     }
 
     // Server should always know the full topic, so this is not needed:
