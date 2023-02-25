@@ -6,6 +6,7 @@ import { BaseClient, channelPrefix, DestType } from "./BaseClient";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { JSONValue } from "./utils/JSON";
 import { TopicClient } from "./Client";
+import { DiffResult } from "./utils/Compare";
 
 /**
  * Server client interface; this is the interface that the server uses to directly communicate with the client
@@ -276,21 +277,38 @@ export class TopicServer extends BaseClient<IServerClient> {
     }
 
     protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<{}>, sender?: IServerClient | undefined): void {
-        if (sender !== undefined) {
-            console.log(`📡 Received request full topic message on ${channel} from ${msg.source} and forwarded to all clients`);
-        } else {
-            console.log(`📬 Received request full topic from self on ${channel}`);
+        if (this.options.logTopics) {
+            if (sender !== undefined) {
+                console.log(`📡 Received request full topic message on ${channel} from ${msg.source} and forwarded to all clients`);
+            } else {
+                console.log(`📬 Received request full topic from self on ${channel}`);
+            }
         }
         super.onReceiveRequestFullTopicMessage(channel, msg, sender);
     }
 
-    // Server should always know the full topic, so this is not needed:
-    protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<RequestFullTopicMessage>, sender?: IServerClient): void {
-        // super.onReceiveRequestFullTopicMessage(channel, msg, sender);
-        // TODO: Forwards request full topic message to all clients except sender (or actually, broadcasting would be fine and prompts other clients to sync up too!)
-        // Alternatively: Broadcast to all clients to request full topic, and only after all clients have responded, send complete topic as one message
-    };
+    protected sendDiffTopic<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
+        if (this.options.logTopics) {
+            if (source !== this.id) {
+                console.log(`⏩ Topic diff forwarded to all clients from ${source}: ${JSON.stringify(diff)}`);
+            } else {
+                console.log(`📢 Topic diff sent from server to all clients: ${JSON.stringify(diff)}`);
+            }
+        }
+        super.sendDiffTopic(channel, diff, source);
+    }
 
+    protected sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
+        if (this.options.logTopics) {
+            if (source !== this.id) {
+                console.log(`⏩ Topic full data forwarded to all clients from ${source}: ${JSON.stringify(this.getTopicSync(channel))}`);
+            } else {
+                console.log(`📢 Topic full data sent from server to all clients: ${JSON.stringify(this.getTopicSync(channel))}`);
+            }
+        }
+        super.sendFullTopic(channel, source);
+    }
+    
     /**
      * Handle a service message received from a client, only handling if server is a recipient, otherwise forwarding to destination
      * @param channel The channel the message was received on
