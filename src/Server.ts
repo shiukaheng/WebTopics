@@ -271,7 +271,7 @@ export class TopicServer extends BaseClient<IServerClient> {
             }
         } else {
             if (this.options.logTopics) {
-                console.log(`📬 Received topic from self on ${channel.name}`);
+                console.log(`📬 Received topic from self on ${channel.name}: ${JSON.stringify(msg)}`);
             }
         }
     }
@@ -281,7 +281,7 @@ export class TopicServer extends BaseClient<IServerClient> {
             if (sender !== undefined) {
                 console.log(`📡 Received request full topic message on ${channel.name} from ${msg.source} and forwarded to all clients`);
             } else {
-                console.log(`📬 Received request full topic from self on ${channel.name}`);
+                console.log(`📬 Received request full topic from self on ${channel.name}: ${JSON.stringify(msg)}`);
             }
         }
         super.onReceiveRequestFullTopicMessage(channel, msg, sender);
