@@ -289,7 +289,7 @@ export class TopicServer extends BaseClient<IServerClient> {
 
     protected sendDiffTopic<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
         if (this.options.logTopics) {
-            if (source !== this.id) {
+            if (source !== undefined) {
                 console.log(`⏩ Topic diff forwarded to all clients from ${source}: ${JSON.stringify(diff)}`);
             } else {
                 console.log(`📢 Topic diff sent from server to all clients: ${JSON.stringify(diff)}`);
@@ -300,7 +300,7 @@ export class TopicServer extends BaseClient<IServerClient> {
 
     protected sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
         if (this.options.logTopics) {
-            if (source !== this.id) {
+            if (source !== undefined) {
                 console.log(`⏩ Topic full data forwarded to all clients from ${source}: ${JSON.stringify(this.getTopicSync(channel))}`);
             } else {
                 console.log(`📢 Topic full data sent from server to all clients: ${JSON.stringify(this.getTopicSync(channel))}`);
