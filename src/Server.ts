@@ -267,11 +267,11 @@ export class TopicServer extends BaseClient<IServerClient> {
         if (sender !== undefined) { // When sender is undefined, it is the server itself
             sender.broadcast.emit(this.getChannelName(channel), msg);
             if (this.options.logTopics) {
-                console.log(`📡 Received topic message on ${channel} from ${msg.source} and forwarded to all clients except sender`);
+                console.log(`📡 Received topic message on ${channel.name} from ${msg.source} and forwarded to all clients except sender`);
             }
         } else {
             if (this.options.logTopics) {
-                console.log(`📬 Received topic from self on ${channel}`);
+                console.log(`📬 Received topic from self on ${channel.name}`);
             }
         }
     }
@@ -279,9 +279,9 @@ export class TopicServer extends BaseClient<IServerClient> {
     protected onReceiveRequestFullTopicMessage<T extends JSONValue>(channel: TopicChannel<T>, msg: WithMeta<{}>, sender?: IServerClient | undefined): void {
         if (this.options.logTopics) {
             if (sender !== undefined) {
-                console.log(`📡 Received request full topic message on ${channel} from ${msg.source} and forwarded to all clients`);
+                console.log(`📡 Received request full topic message on ${channel.name} from ${msg.source} and forwarded to all clients`);
             } else {
-                console.log(`📬 Received request full topic from self on ${channel}`);
+                console.log(`📬 Received request full topic from self on ${channel.name}`);
             }
         }
         super.onReceiveRequestFullTopicMessage(channel, msg, sender);
@@ -290,9 +290,9 @@ export class TopicServer extends BaseClient<IServerClient> {
     protected sendDiffTopic<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, source?: string): void {
         if (this.options.logTopics) {
             if (source !== undefined) {
-                console.log(`⏩ Topic diff forwarded to all clients from ${source}: ${JSON.stringify(diff)}`);
+                console.log(`⏩ Topic diff on ${channel.name} forwarded to all clients from ${source}: ${JSON.stringify(diff)}`);
             } else {
-                console.log(`📢 Topic diff sent from server to all clients: ${JSON.stringify(diff)}`);
+                console.log(`📢 Topic diff on ${channel.name} sent from server to all clients: ${JSON.stringify(diff)}`);
             }
         }
         super.sendDiffTopic(channel, diff, source);
@@ -301,9 +301,9 @@ export class TopicServer extends BaseClient<IServerClient> {
     protected sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
         if (this.options.logTopics) {
             if (source !== undefined) {
-                console.log(`⏩ Topic full data forwarded to all clients from ${source}: ${JSON.stringify(this.getTopicSync(channel))}`);
+                console.log(`⏩ Topic full data on ${channel.name} forwarded to all clients from ${source}: ${JSON.stringify(this.getTopicSync(channel))}`);
             } else {
-                console.log(`📢 Topic full data sent from server to all clients: ${JSON.stringify(this.getTopicSync(channel))}`);
+                console.log(`📢 Topic full data on ${channel.name} sent from server to all clients: ${JSON.stringify(this.getTopicSync(channel))}`);
             }
         }
         super.sendFullTopic(channel, source);
