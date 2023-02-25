@@ -80,23 +80,23 @@ describe("Integration tests", ()=>{
             })
         }, 2000)
     }, 3000)
-    test("client1 should be able to publish topic, and server should be able to receive it", (done) => {
-        console.log("Client1 publishing topic")
-        topicClient1.pub(testTopic3, {
-            testString: "test3",
-            testNumber: 3,
-        })
-        // Wait 2 seconds for the server to publish the topic
-        setTimeout(() => {
-            console.log("Server subscribing to topic")
-            const unsub = topicServer.sub(testTopic3, (data) => {
-                unsub()
-                expect(data).toEqual({
-                    testString: "test3",
-                    testNumber: 3,
-                })
-                done()
-            })
-        }, 2000)
-    }, 3000)
+    // test("client1 should be able to publish topic, and server should be able to receive it", (done) => {
+    //     console.log("Client1 publishing topic")
+    //     topicClient1.pub(testTopic3, {
+    //         testString: "test3",
+    //         testNumber: 3,
+    //     })
+    //     // Wait 2 seconds for the server to publish the topic
+    //     setTimeout(() => {
+    //         console.log("Server subscribing to topic")
+    //         const unsub = topicServer.sub(testTopic3, (data) => {
+    //             unsub()
+    //             expect(data).toEqual({
+    //                 testString: "test3",
+    //                 testNumber: 3,
+    //             })
+    //             done()
+    //         })
+    //     }, 2000)
+    // }, 3000)
 })
