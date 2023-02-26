@@ -297,6 +297,20 @@ export abstract class BaseClient<V = void> {
     }
 
     /**
+     * Subscribes to the changes of a topic channel once (convenience function)
+     * @param channel The channel object
+     * @param handler The handler function to call when the topic changes
+     * @param initialUpdate Whether to immediately call the handler with the current topic value when subscribing
+     * @returns The unsubscriber function
+     */
+    subOnce<T extends JSONValue>(channel: TopicChannel<T>, handler: Subscriber<T>, initialUpdate: boolean = true): Unsubscriber {
+        return this.sub(channel, (topic, unsubscriber, history) => {
+            unsubscriber();
+            handler(topic, unsubscriber, history);
+        }, initialUpdate);
+    }
+
+    /**
      * Initializes a topic channel with handlers and a topic map entry
      * @param channel The channel object
      */
