@@ -42,6 +42,22 @@ export type DestType = string[] | "*";
 export type Unsubscriber = () => void;
 
 /**
+ * Extra metadata sent with each update to a topic
+ */
+export interface SubscriberMeta<T extends JSONValue> {
+    /**
+     * The diff compared to the previous value
+     */
+    diff: DiffResult<T, T>;
+    /**
+     * The source of the update
+     */
+    source: string;
+} 
+
+export type Subscriber<T extends JSONValue> = (value: T, unsubscribe: Unsubscriber, meta: SubscriberMeta<T>) => void;
+
+/**
  * Base class for {@link TopicClient} and {@link TopicServer} classes, responsible for keeping track of topics and services, and sending and receiving messages
  */
 export abstract class BaseClient<V = void> {
@@ -56,7 +72,7 @@ export abstract class BaseClient<V = void> {
     /**
      * Map of topic channel names to a list of change handlers 
      */
-    protected topicHandlerMap: Map<string, ((value: JSONValue, diff?: DiffResult<JSONValue, JSONValue>) => void)[]> = new Map();
+    protected topicHandlerMap: Map<string, (Subscriber<JSONValue>)[]> = new Map();
     /**
      * Map of topic channel names to their current values
      */
@@ -81,6 +97,10 @@ export abstract class BaseClient<V = void> {
      * Map of open service request IDs to their rejectors
      */
     protected serviceRejectors: Map<string, (reason: any) => void> = new Map();
+    /**
+     * Map of topic to their last valid diffs and sources
+     */
+    protected lastValidDiffMap: Map<string, {diff: DiffResult<JSONValue, JSONValue>, source: string}> = new Map();
 
     // Abstract methods
 
@@ -111,7 +131,6 @@ export abstract class BaseClient<V = void> {
      * Initalize the client by subscribing to the server meta channel, and publishing the client's meta data to the server
      */
     protected initialize(): void {
-        this.sub(serverMetaChannel);
         this.pub(serverMetaChannel, {
             clients: {
                 [this._id]: {
@@ -261,27 +280,18 @@ export abstract class BaseClient<V = void> {
      * @param initialUpdate Whether to immediately call the handler with the current topic value when subscribing
      * @returns The unsubscriber function
      */
-    sub<T extends JSONValue>(channel: TopicChannel<T>, handler?: (topic: T, diff?: DiffResult<T, T>) => void, initialUpdate: boolean = true): Unsubscriber {
+    sub<T extends JSONValue>(channel: TopicChannel<T>, handler: Subscriber<T>, initialUpdate: boolean = true): Unsubscriber {
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
         this.initTopicChannel<T>(channel);
         const eventName = this.getChannelName(channel);
-        if (handler !== undefined) {
-            this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
-        }
+        this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
+        const unsubscriber = this.createUnsubscriber(eventName, handler);
         if (initialUpdate && this.hasValidTopic(channel)) {
-            handler?.(this.getTopicSync(channel));
-        }
-        const unsubscriber = () => {
-            // Remove handler from handler map
-            const handlers = this.topicHandlerMap.get(eventName);
-            if (handlers !== undefined) {
-                const index = handlers.indexOf(handler as (topic: JSONValue) => void);
-                if (index !== -1) {
-                    handlers.splice(index, 1);
-                } else {
-                    console.warn("Handler not found in handler map");
-                }
-            }
+            // Manually call the handler with the current topic value
+            const history = this.lastValidDiffMap.get(eventName);
+            if (history === undefined) throw new Error("History is undefined");
+            // @ts-ignore - this is a valid topic, but the type system doesn't know that
+            handler(this.getTopicSync(channel), unsubscriber, history);
         }
         return unsubscriber;
     }
@@ -495,7 +505,8 @@ export abstract class BaseClient<V = void> {
                     // console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
                     this.topicsValid.set(eventName, true);
                     this.topicMap.set(eventName, newTopic);
-                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic, diffResult));
+                    this.updateTopic(eventName, newTopic, diffResult, msg);
+                    // Instead, iterate over the handlers and their index as pairs, so we can create an unsubscribe function that removes the handler at the correct index
                 } else {
                     // console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
                     // Still update the topic value, but don't call the handler
@@ -506,7 +517,7 @@ export abstract class BaseClient<V = void> {
                     // console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
                     // If previously valid and now is still valid, apply the changes
                     this.topicMap.set(eventName, newTopic);
-                    this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic, diffResult));
+                    this.updateTopic(eventName, newTopic, diffResult, msg);
                 } else {
                     // console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
                     // If previously valid and now is invalid, don't apply the changes
@@ -514,6 +525,27 @@ export abstract class BaseClient<V = void> {
             }
             // console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
         }
+    }
+
+    private createUnsubscriber<T extends JSONValue>(eventName: string, handler: Subscriber<T>) {
+        return () => {
+            // Remove this handler from the list of handlers
+            const handlers = this.topicHandlerMap.get(eventName);
+            if (handlers !== undefined) {
+                const index = handlers.indexOf(handler as Subscriber<JSONValue>);
+                if (index > -1) {
+                    handlers.splice(index, 1);
+                }
+            }
+        };
+    }
+
+    private updateTopic<T extends JSONValue>(eventName: string, newTopic: any, diffResult: DiffResult<T, T>, msg: WithMeta<{ modified?: string | number | boolean | {} | unknown[] | Record<string, unknown> | null | undefined; deleted?: string | number | boolean | {} | unknown[] | Record<string, unknown> | null | undefined; }>) {
+        this.lastValidDiffMap.set(eventName, {diff: diffResult, source: msg.source})
+        this.topicHandlerMap.get(eventName)?.forEach(handler => {
+            const unsubscribe = this.createUnsubscriber(eventName, handler);
+            handler(newTopic, unsubscribe, { diff: diffResult, source: msg.source });
+        });
     }
 
     /**
