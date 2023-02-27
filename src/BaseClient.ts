@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { TopicServer } from "./Server";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./utils/Compare";
-import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "./messages/Messages";
+import { metaMessageSchema, MessageMeta, RequestFullTopicMessage, topicMessageSchema, requestFullTopicMessageSchema, TopicMessage, WithMeta, MessageType, ServiceMessage, serviceMessageSchema, ServiceResponseMessage, serviceResponseMessageSchema } from "./Messages";
 import { JSONObject, JSONValue } from "./utils/JSON";
 import { v4 as uuidv4 } from 'uuid';
 import { serverMetaChannel, ServerMeta } from "./metaChannels";

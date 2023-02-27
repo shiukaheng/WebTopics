@@ -1,6 +1,6 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
-import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage, RequestFullTopicMessage } from "./messages/Messages";
+import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage, RequestFullTopicMessage } from "./Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
 import { BaseClient, channelPrefix, DestType } from "./BaseClient";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";

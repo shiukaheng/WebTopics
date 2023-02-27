@@ -1,6 +1,9 @@
-export { TopicServer, IServerOptions } from "./Server";
-export { TopicClient } from "./Client";
-export { createTopic, createService } from "./utils/createChannel"
-export { Channel } from "./utils/Channel";
-export { JSONValue, JSONObject, JSONArray } from "./utils/JSON";
-export { serverMetaSchema, serverMetaChannel, ServerMeta } from "./metaChannels";
+export * from "./BaseClient";
+export * from "./Client";
+export * from "./metaChannels";
+export * from "./Server";
+export * from "./Messages";
+export * from "./utils/Channel"
+export * from "./utils/Compare"
+export * from "./utils/createChannel"
+export * from "./utils/JSON"
