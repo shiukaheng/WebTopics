@@ -1,7 +1,6 @@
 # ⚡️ WebTopics
 
-Real-time topics and services for web apps using Socket.io and Zod, inspired by ROS.
-Meant for use in low-latency interactive applications on local networks.
+Typed pub / sub, request / responses for web apps using Socket.io and Zod, inspired by ROS.
 
 [[ Documentation ]](https://shiukaheng.github.io/WebTopics/)
 ## Features
