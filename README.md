@@ -15,10 +15,12 @@ Typed pub / sub, request / responses for web apps using Socket.io and Zod, inspi
 ### Collaborative topics
   ```typescript
   client1.pub(channel, {a: "1"})
-  client2.pub(channel, {b: "2"})
+  client2.pub(channel, {b: "2"}) // New state merged on old by default
   client3.sub(channel, (value) => {
     console.log(value) // {a: "1", b: "2"}
   })
+  client2.pub(channel, {b: "2"}, true) // Or publishing as an overwrite
+  // client 3 receives: {b: "2"}
   ```
 ### Async service calls
   ```typescript
