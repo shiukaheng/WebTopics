@@ -3,7 +3,7 @@
 Real-time topics and services for web apps using Socket.io and Zod, inspired by ROS.
 Meant for use in low-latency interactive applications on local networks.
 
-[[Documentation]](https://shiukaheng.github.io/WebTopics/)
+[[ Documentation ]](https://shiukaheng.github.io/WebTopics/)
 ## Features
 ### Typed and validated topics and services via Zod
   ```typescript
