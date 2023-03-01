@@ -41,6 +41,11 @@ export type ServiceChannel<T extends RequestType=void, U extends ServiceResponse
     responseSchema: z.ZodSchema<U>;
 }
 
+/**
+ * Extractor type for getting the callback type of a service channel
+ */
+export type ServiceChannelCallback<T extends ServiceChannel> = T extends ServiceChannel<infer T, infer U> ? (request: T) => U : never;
+
 export const serviceChannelSchema = channelSchema.extend({
     mode: z.literal("service"),
     responseSchema: z.unknown(),
@@ -49,6 +54,11 @@ export const serviceChannelSchema = channelSchema.extend({
 export type TopicChannel<T extends JSONValue> = Channel<T> & {
     mode: "topic";
 }
+
+/**
+ * Extractor type for getting the data type of a topic channel
+ */
+export type TopicChannelData<T extends TopicChannel<any>> = T extends TopicChannel<infer T> ? T : never;
 
 export const topicChannelSchema = channelSchema.extend({
     mode: z.literal("topic"),
