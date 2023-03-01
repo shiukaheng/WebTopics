@@ -16,9 +16,8 @@
 <a href="#⚡️-webtopics" id="⚡️-webtopics" style="color: inherit; text-decoration: none;">
   <h1>⚡️ WebTopics</h1>
 </a>
-<p>Real-time topics and services for web apps using Socket.io and Zod, inspired by ROS.
-Meant for use in low-latency interactive applications on local networks.</p>
-<p>Documentation(<a href="https://shiukaheng.github.io/WebTopics/">https://shiukaheng.github.io/WebTopics/</a>)</p>
+<p>Typed pub / sub, request / responses for web apps using Socket.io and Zod, inspired by ROS.</p>
+<p> Documentation (<a href="https://shiukaheng.github.io/WebTopics/">https://shiukaheng.github.io/WebTopics/</a>)</p>
 
 <a href="#features" id="features" style="color: inherit; text-decoration: none;">
   <h2>Features</h2>
@@ -33,7 +32,7 @@ Meant for use in low-latency interactive applications on local networks.</p>
 <a href="#collaborative-topics" id="collaborative-topics" style="color: inherit; text-decoration: none;">
   <h3>Collaborative topics</h3>
 </a>
-<pre><code class="language-typescript"><span class="hl-5">client1</span><span class="hl-1">.</span><span class="hl-3">pub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, {</span><span class="hl-5">a:</span><span class="hl-1"> </span><span class="hl-4">&quot;1&quot;</span><span class="hl-1">})</span><br/><span class="hl-5">client2</span><span class="hl-1">.</span><span class="hl-3">pub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, {</span><span class="hl-5">b:</span><span class="hl-1"> </span><span class="hl-4">&quot;2&quot;</span><span class="hl-1">})</span><br/><span class="hl-5">client3</span><span class="hl-1">.</span><span class="hl-3">sub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, (</span><span class="hl-5">value</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-5">value</span><span class="hl-1">) </span><span class="hl-7">// {a: &quot;1&quot;, b: &quot;2&quot;}</span><br/><span class="hl-1">})</span>
+<pre><code class="language-typescript"><span class="hl-5">client1</span><span class="hl-1">.</span><span class="hl-3">pub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, {</span><span class="hl-5">a:</span><span class="hl-1"> </span><span class="hl-4">&quot;1&quot;</span><span class="hl-1">})</span><br/><span class="hl-5">client2</span><span class="hl-1">.</span><span class="hl-3">pub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, {</span><span class="hl-5">b:</span><span class="hl-1"> </span><span class="hl-4">&quot;2&quot;</span><span class="hl-1">}) </span><span class="hl-7">// New state merged on old by default</span><br/><span class="hl-5">client3</span><span class="hl-1">.</span><span class="hl-3">sub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, (</span><span class="hl-5">value</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-5">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-5">value</span><span class="hl-1">) </span><span class="hl-7">// {a: &quot;1&quot;, b: &quot;2&quot;}</span><br/><span class="hl-1">})</span><br/><span class="hl-5">client2</span><span class="hl-1">.</span><span class="hl-3">pub</span><span class="hl-1">(</span><span class="hl-5">channel</span><span class="hl-1">, {</span><span class="hl-5">b:</span><span class="hl-1"> </span><span class="hl-4">&quot;2&quot;</span><span class="hl-1">}, </span><span class="hl-0">true</span><span class="hl-1">) </span><span class="hl-7">// Or publishing as an overwrite</span><br/><span class="hl-7">// client 3 receives: {b: &quot;2&quot;}</span>
 </code></pre>
 
 <a href="#async-service-calls" id="async-service-calls" style="color: inherit; text-decoration: none;">
