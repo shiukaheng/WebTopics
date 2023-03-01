@@ -44,7 +44,7 @@ export type ServiceChannel<T extends RequestType=void, U extends ServiceResponse
 /**
  * Extractor type for getting the callback type of a service channel
  */
-export type ServiceChannelCallback<T extends ServiceChannel> = T extends ServiceChannel<infer T, infer U> ? (request: T) => U : never;
+export type ServiceChannelCallback<T extends ServiceChannel> = T extends ServiceChannel<infer T, infer U> ? (request: T) => Promise<U> : never;
 
 export const serviceChannelSchema = channelSchema.extend({
     mode: z.literal("service"),
