@@ -1,9 +1,8 @@
 # ⚡️ WebTopics
 
-Real-time topics and services for web apps using Socket.io and Zod, inspired by ROS.
-Meant for use in low-latency interactive applications on local networks.
+Typed pub / sub, request / responses for web apps using Socket.io and Zod, inspired by ROS.
 
-[[Documentation]](https://shiukaheng.github.io/WebTopics/)
+[[ Documentation ]](https://shiukaheng.github.io/WebTopics/)
 ## Features
 ### Typed and validated topics and services via Zod
   ```typescript
@@ -16,10 +15,12 @@ Meant for use in low-latency interactive applications on local networks.
 ### Collaborative topics
   ```typescript
   client1.pub(channel, {a: "1"})
-  client2.pub(channel, {b: "2"})
+  client2.pub(channel, {b: "2"}) // New state merged on old by default
   client3.sub(channel, (value) => {
     console.log(value) // {a: "1", b: "2"}
   })
+  client2.pub(channel, {b: "2"}, true) // Or publishing as an overwrite
+  // client 3 receives: {b: "2"}
   ```
 ### Async service calls
   ```typescript
