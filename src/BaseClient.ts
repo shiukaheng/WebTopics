@@ -442,23 +442,35 @@ export abstract class BaseClient<V = void> {
         } else {
             // Run the handler
             var result: ServiceResponseType | Promise<ServiceResponseType>;
+            let sentResponse = false;
             try {
                 result = handler(msg.serviceData as JSONValue);
             } catch (e) {
                 // Send an internal error
+                sentResponse = true;
+                console.error(`Error in service handler for ${channel.name}:`, e);
                 this.sendServiceErrorMessage(channel, msg.serviceId, JSON.stringify(e), msg.source);
             }
             // If the result is a promise, wait for it to resolve
             if (result instanceof Promise) {
                 result.then((data) => {
                     // Send the result
+                    console.log("Sending async service response", data);
+                    if (sentResponse) return
+                    sentResponse = true;
                     this.sendServiceResponseMessage(channel, msg.serviceId, data, msg.source)
                 }).catch((err) => {
                     // Send an internal error
+                    console.error(`Error in async service handler for ${channel.name}:`, err);
+                    if (sentResponse) return
+                    sentResponse = true;
                     this.sendServiceErrorMessage(channel, msg.serviceId, JSON.stringify(err), msg.source)
                 });
             } else {
                 // Send the result
+                console.log("Sending service response", result);
+                if (sentResponse) return
+                sentResponse = true;
                 this.sendServiceResponseMessage(channel, msg.serviceId, result, msg.source);
             }
         }
