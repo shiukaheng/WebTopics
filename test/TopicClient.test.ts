@@ -21,10 +21,12 @@ describe("TopicClient tests", () => {
     if (socketServer === undefined) {
         throw new Error("Could not create server")
     }
-    const topicServer = new TopicServer(socketServer)
+    const topicServer = new TopicServer(socketServer, {
+        logTopics: true,
+    })
     // Create topic
     const testTopicSchema = z.object({
-        testString: z.string(),
+        testString: z.string().optional(),
         testNumber: z.number(),
         testBoolean: z.boolean(),
         testArray: z.array(z.string()),
@@ -74,7 +76,7 @@ describe("TopicClient tests", () => {
             called = true
         }, false)
         unsub()
-        topicClient.pub(testTopic, {
+        topicClient.pub(testTopic, { // Would send out {} 
             testString: "initial",
             testNumber: 1,
             testBoolean: true,
@@ -188,6 +190,24 @@ describe("TopicClient tests", () => {
         topicClient.pub(testTopic, {
             testObject: { testNestedString: "test3" }
         }, true, false)
+    })
+    test("should be able to delete a property from a topic", (done) => {
+        console.log("Testing delete")
+        // Subscribe first, then publish
+        const unsub = topicClient.sub(testTopic, (data) => {
+            // testString should be "test3" now
+            expect(data.testString).toBe(undefined)
+            done()
+            unsub()
+        }, false)
+        topicClient.pub(testTopic, {
+            testNumber: 1,
+            testBoolean: true,
+            testArray: ["test"],
+            testObject: {
+                testNestedString: "test"
+            }
+        }, true, true)
     })
     test("should not receive errors if a topic is published with invalid data", (done) => {
         var called = false

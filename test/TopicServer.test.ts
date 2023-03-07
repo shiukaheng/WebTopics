@@ -13,7 +13,7 @@ describe("TopicServer tests", () => {
     })
     // === TESTS FOR TOPICS ===
     const testTopicSchema = z.object({
-        testString: z.string(),
+        testString: z.string().optional(),
         testNumber: z.number(),
         testBoolean: z.boolean(),
         testArray: z.array(z.string()),
@@ -174,6 +174,23 @@ describe("TopicServer tests", () => {
             done()
             unsub()
         }, 100)
+    })
+    test("should be able to delete a property from a topic", (done) => {
+        // Subscribe first, then publish
+        const unsub = impl.sub(testTopic, (data) => {
+            // testString should be "test3" now
+            expect(data.testString).toBe(undefined)
+            done()
+            unsub()
+        }, false)
+        impl.pub(testTopic, {
+            testNumber: 1,
+            testBoolean: true,
+            testArray: ["test"],
+            testObject: {
+                testNestedString: "test"
+            }
+        }, true, true)
     })
     // === TESTS FOR SERVICES ===
     const testService = createService("test", z.object({

@@ -578,7 +578,7 @@ export abstract class BaseClient<V = void> {
         if (this.hasValidTopic(channel)) {
             this.sendFullTopic(channel);
         } else {
-            // console.warn(`Invalid topic for channel ${channel.name}, sending anyway`);
+            console.warn(`Invalid topic for channel ${channel.name}, sending anyway:`, this.topicMap.get(this.getChannelName(channel)));
             this.sendFullTopic(channel);
         }
     }
@@ -723,6 +723,7 @@ export abstract class BaseClient<V = void> {
         if (currentTopic === undefined) {
             throw new Error(`Topic ${channel.name} not found`);
         }
+        console.log(this.topicMap);
         if (!this.topicsValid.get(channelName)) {
             throw new Error("Topic is not valid");
         }

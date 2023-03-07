@@ -301,9 +301,9 @@ export class TopicServer extends BaseClient<IServerClient> {
     protected sendFullTopic<T extends JSONValue>(channel: TopicChannel<T>, source?: string): void {
         if (this.options.logTopics) {
             if (source !== undefined) {
-                console.log(`⏩ Topic full data on ${channel.name} forwarded to all clients from ${source}: ${JSON.stringify(this.getTopicSync(channel))}`);
+                console.log(`⏩ Topic full data on ${channel.name} forwarded to all clients from ${source}: ${JSON.stringify(this._getUnsafeTopic(channel))}`);
             } else {
-                console.log(`📢 Topic full data on ${channel.name} sent from server to all clients: ${JSON.stringify(this.getTopicSync(channel))}`);
+                console.log(`📢 Topic full data on ${channel.name} sent from server to all clients: ${JSON.stringify(this._getUnsafeTopic(channel))}`);
             }
         }
         super.sendFullTopic(channel, source);
