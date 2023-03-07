@@ -316,6 +316,13 @@ export class TopicServer extends BaseClient<IServerClient> {
      * @param sender The socket of the sender
      */
     protected onReceiveServiceMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceMessage>, sender?: IServerClient): void {
+        if (this.options.logServices) {
+            if (sender !== undefined) {
+                console.log(`📡 Received service message for ${msg.serviceId} on ${channel.name} from ${msg.source} and forwarded to ${msg.dest}:`, msg);
+            } else {
+                console.log(`📬 Received service message from self for ${msg.serviceId} on ${channel.name}: ${JSON.stringify(msg)}:`, msg);
+            }
+        }
         // Skip if server not a recipient
         if (msg.dest === "*" || msg.dest.includes(this.id)) {
             super.onReceiveServiceMessage(channel, msg, sender);
@@ -333,6 +340,13 @@ export class TopicServer extends BaseClient<IServerClient> {
      * @param sender The socket of the sender
      */
     protected onReceiveServiceResponseMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, msg: WithMeta<ServiceResponseMessage>, sender?: IServerClient): void {
+        if (this.options.logServices) {
+            if (sender !== undefined) {
+                console.log(`📡 Received service response message for ${msg.serviceId} on ${channel.name} from ${msg.source} and forwarded to ${msg.dest}:`, msg);
+            } else {
+                console.log(`📬 Received service response message from self for ${msg.serviceId} on ${channel.name}: ${JSON.stringify(msg)}:`, msg);
+            }
+        }
         // Skip if server not a recipient
         if (msg.dest === this.id) {
             super.onReceiveServiceResponseMessage(channel, msg, sender);
