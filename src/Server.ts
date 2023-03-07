@@ -373,5 +373,40 @@ export class TopicServer extends BaseClient<IServerClient> {
             }
         });
     }
+
+    protected sendServiceMessage<T extends RequestType = void, U extends ServiceResponseType = void>(channel: ServiceChannel<T, U>, serviceData: T, dest: DestType, serviceID: string): void {
+        if (this.options.logServices) {
+            console.log(`📢 Service message for ${serviceID} on ${channel.name} sent from server to ${dest}:`, serviceData);
+        }
+        super.sendServiceMessage(channel, serviceData, dest, serviceID);
+    }
+
+    /**
+     * Sends a service response message to the specified service channel and destination
+     * @param channel The channel object
+     * @param id The service ID
+     * @param result The response data
+     * @param dest The destination of the message
+     */
+    protected sendServiceResponseMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, result: ServiceResponseType, dest: string) {
+        if (this.options.logServices) {
+            console.log(`📢 Service response message for ${id} on ${channel.name} sent from server to ${dest}:`, result);
+        }
+        super.sendServiceResponseMessage(channel, id, result, dest);
+    }
+
+    /**
+     * Sends a service error message to the specified service channel and destination
+     * @param channel The channel object
+     * @param id The service ID
+     * @param errorMesssage The error message
+     * @param dest The destination of the message
+     */
+    protected sendServiceErrorMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, errorMesssage: string, dest: string) {
+        if (this.options.logServices) {
+            console.log(`📢 Service error message for ${id} on ${channel.name} sent from server to ${dest}:`, errorMesssage);
+        }
+        super.sendServiceErrorMessage(channel, id, errorMesssage, dest);
+    }
     
 }

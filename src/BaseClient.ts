@@ -229,20 +229,6 @@ export abstract class BaseClient<V = void> {
     }
 
     /**
-     * Sends a no service handler response message to the specified service channel and destination
-     * @param channel The channel object
-     * @param id The service ID
-     * @param dest The destination of the message
-     */
-    protected sendNoServiceHandlerMessage<T extends RequestType=void, U extends ServiceResponseType=void>(channel: ServiceChannel<T, U>, id: string, dest: string) {
-        this.emitRawEvent(this.getChannelName(channel), this.wrapMessage({
-            serviceId: id,
-            dest,
-            noServiceHandler: true
-        }, "serviceResponse"), [dest]);
-    }
-
-    /**
      * Sends a service response message to the specified service channel and destination
      * @param channel The channel object
      * @param id The service ID
@@ -452,7 +438,6 @@ export abstract class BaseClient<V = void> {
         if (handler === undefined) {
             console.warn(`No handler for channel ${channel.name}`);
             // Dest is now the source, source is now the dest (object's id, which is that be default anyway)
-            // this.sendNoServiceHandlerMessage(channel, msg.serviceId, msg.source);
             this.sendServiceErrorMessage(channel, msg.serviceId, "No service handler", msg.source);
         } else {
             // Run the handler
