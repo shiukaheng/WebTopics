@@ -455,7 +455,7 @@ export abstract class BaseClient<V = void> {
             if (result instanceof Promise) {
                 result.then((data) => {
                     // Send the result
-                    console.log("Sending async service response", data);
+                    // console.log("Sending async service response", data);
                     if (sentResponse) return
                     sentResponse = true;
                     this.sendServiceResponseMessage(channel, msg.serviceId, data, msg.source)
@@ -468,7 +468,7 @@ export abstract class BaseClient<V = void> {
                 });
             } else {
                 // Send the result
-                console.log("Sending service response", result);
+                // console.log("Sending service response", result);
                 if (sentResponse) return
                 sentResponse = true;
                 this.sendServiceResponseMessage(channel, msg.serviceId, result, msg.source);
