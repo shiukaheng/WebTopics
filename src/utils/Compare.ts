@@ -159,19 +159,22 @@ export function mergeDiff<T extends JSONValue, U extends JSONValue>(oldValue: T 
 /**
  * Recursively deletes properties from an object in place with a delete object in the diff format
  */
-function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T | undefined> {
+export function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T | undefined> {
     // Get the type of the old value
     const deleteObjectType = valueType(deleteObject);
     if (deleteObjectType === "undefined") {
-        // If deleteObject is undefined, return the old value
+        // If deleteObject is undefined, return the old value - since it means we should not delete anything
         return oldValue as RecursivePartial<T>;
-    } else if (deleteObjectType === "primitive") {
-        // If deleteObject is primitive, it implies that it is null and we should delete the old value, so return undefined
+    } else if (deleteObject === null) {
+        // If deleteObject is null then we should delete the old value, so return undefined
         return undefined as RecursivePartial<T>;
+    } else if (deleteObjectType === "primitive") {
+        // If deleteObject is a primitive, it should have been null and we should have returned above, so throw an error
+        throw new Error("deleteObject is a primitive, should not happen!");
     } else {
         // Else, deleteObject is an object, so we need to recurse
         const result: RecursivePartial<T> = {} as RecursivePartial<T>;
-        for (const key of Object.keys(deleteObject as object)) {
+        for (const key of Object.keys(oldValue as any)) {
             (result as any)[key] = recursiveDelete((oldValue as any)[key], (deleteObject as any)[key]);
             // If the result is undefined, delete the property
             if ((result as any)[key] === undefined) {
@@ -181,6 +184,29 @@ function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObj
         return result;
     }
 }
+
+// export function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, deleteObject: RecursivePartial<RecursiveNull<T>>): RecursivePartial<T | undefined> {
+//     // Get the type of the old value
+//     const deleteObjectType = valueType(deleteObject);
+//     if (deleteObjectType === "undefined") {
+//         // If deleteObject is undefined, return the old value
+//         return oldValue as RecursivePartial<T>;
+//     } else if (deleteObjectType === "primitive") {
+//         // If deleteObject is primitive, it implies that it is null and we should delete the old value, so return undefined
+//         return undefined as RecursivePartial<T>;
+//     } else {
+//         // Else, deleteObject is an object, so we need to recurse
+//         const result: RecursivePartial<T> = {} as RecursivePartial<T>;
+//         for (const key of Object.keys(deleteObject as object)) {
+//             (result as any)[key] = recursiveDelete((oldValue as any)[key], (deleteObject as any)[key]);
+//             // If the result is undefined, delete the property
+//             if ((result as any)[key] === undefined) {
+//                 delete (result as any)[key];
+//             }
+//         }
+//         return result;
+//     }
+// }
 
 /**
  * Recursively merges two objects in place with a merge object in the diff format
