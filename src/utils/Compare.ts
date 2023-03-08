@@ -171,6 +171,9 @@ export function recursiveDelete<T extends JSONValue>(oldValue: T | undefined, de
     } else if (deleteObjectType === "primitive") {
         // If deleteObject is a primitive, it should have been null and we should have returned above, so throw an error
         throw new Error("deleteObject is a primitive, should not happen!");
+    } else if (oldValue === undefined) {
+        // If oldValue is undefined, then we should return undefined
+        return undefined as RecursivePartial<T>; 
     } else {
         // Else, deleteObject is an object, so we need to recurse
         const result: RecursivePartial<T> = {} as RecursivePartial<T>;
@@ -218,7 +221,12 @@ function recursiveMerge<T extends JSONValue, U extends JSONValue>(oldValue: T | 
     // 9 possible cases
     // Types are different (6 cases)
     if (oldValueType !== mergeObjectType) {
-        return mergeObject as RecursivePartial<T & U>;
+        if (oldValueType === "undefined") {
+            // If old value is undefined, return the merge object
+            return mergeObject as RecursivePartial<T & U>;
+        } else {
+            return oldValue as RecursivePartial<T & U>;
+        }
     } else {
         // Types are the same (3 cases)
         if (oldValueType === "undefined" || oldValueType === "primitive") {

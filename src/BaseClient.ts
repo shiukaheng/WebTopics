@@ -592,6 +592,9 @@ export abstract class BaseClient<V = void> {
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
+        if (data === undefined) {
+            throw new Error("Data is undefined, which is equivalent to deleting the topic. Invalid operation.");
+        }
         this.initTopicChannel(channel);
 
         const eventName = this.getChannelName(channel);
