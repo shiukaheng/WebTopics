@@ -7,6 +7,7 @@ import { JSONObject, JSONValue } from "./utils/JSON";
 import { v4 as uuidv4 } from 'uuid';
 import { serverMetaChannel, ServerMeta } from "./metaChannels";
 import zodToJsonSchema from "zod-to-json-schema";
+import { cloneDeep } from "lodash";
 
 export const channelPrefix = "ch-";
 export const servicePrefix = "sv-";
@@ -632,6 +633,7 @@ export abstract class BaseClient<V = void> {
      * @param source Optional source of the update (Only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
     pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf: boolean=true, publishDeletes: boolean=true, source?: string): void {
+        data = cloneDeep(data);
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
         }
