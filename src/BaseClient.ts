@@ -129,6 +129,14 @@ export abstract class BaseClient<V = void> {
      * Map of topic to their last valid diffs and sources
      */
     protected lastValidDiffMap: Map<string, {diff: DiffResult<JSONValue, JSONValue>, source: string}> = new Map();
+    /**
+     * Set of all initialized TopicChannels
+     */
+    protected initializedTopicChannels: Set<TopicChannel<JSONValue>> = new Set();
+    /**
+     * Set of all initialized ServiceChannels
+     */
+    protected initializedServiceChannels: Set<ServiceChannel<RequestType, ServiceResponseType>> = new Set();
 
     /**
      * Options
@@ -370,6 +378,7 @@ export abstract class BaseClient<V = void> {
                 console.warn(`Invalid message received for topic channel ${channel.name}:`, msg);
             });
             this.sendRequestFullTopic(channel);
+            this.initializedTopicChannels.add(channel);
         }
     }
 
@@ -431,6 +440,7 @@ export abstract class BaseClient<V = void> {
                     }
                 }
             }, true, false);
+            this.initializedServiceChannels.add(channel);
         }
     }
 

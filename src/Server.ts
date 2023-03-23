@@ -119,6 +119,10 @@ export class TopicServer extends BaseClient<IServerClient> {
                 }
                 this.clientToSocketID.set(data, sender.id);
                 this.socketToClientID.set(sender.id, data);
+                // Request full topic for all topics
+                this.initializedTopicChannels.forEach((channel) => {
+                    this.sendRequestFullTopic(channel)
+                });
                 console.log(`✅ Client ${data} connected to server`);
             } else {
                 throw new Error("No sender provided, should not happen for id event"); // No senders happen when server sends message to itself
