@@ -1,6 +1,6 @@
 // Class extends SocketIO.Server but with extra methods to allow construction of topic sharing server
 
-import { BaseClient } from "./BaseClient";
+import { BaseClient, IBaseClientOptions } from "./BaseClient";
 
 /**
  * Interface for a socket client that will be used by the TopicClient class
@@ -22,8 +22,8 @@ export class TopicClient extends BaseClient {
      * Creates a new TopicClient instance
      * @param socketClient The socket client instance
      */
-    constructor(socketClient: IClient) {
-        super();
+    constructor(socketClient: IClient, options?: Partial<IBaseClientOptions>) {
+        super(options);
         this.socket = socketClient;
         this.initialize();
         this.socket.on("connect", () => {

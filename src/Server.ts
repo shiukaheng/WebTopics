@@ -2,11 +2,12 @@
 
 import { WithMeta, TopicMessage, ServiceMessage, MessageMeta, ServiceResponseMessage, RequestFullTopicMessage } from "./Messages";
 import { ServerMeta, serverMetaChannel } from "./metaChannels";
-import { BaseClient, channelPrefix, DestType } from "./BaseClient";
+import { BaseClient, channelPrefix, DestType, IBaseClientOptions } from "./BaseClient";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { JSONValue } from "./utils/JSON";
 import { TopicClient } from "./Client";
 import { DiffResult } from "./utils/Compare";
+
 
 /**
  * Server client interface; this is the interface that the server uses to directly communicate with the client
@@ -28,19 +29,6 @@ export interface IServerClient {
 export interface IServer {
     on: (event: string, listener: (socket: IServerClient) => void) => void;
     emit: (event: string, data: any) => void;
-}
-
-export interface IServerOptions {
-    /**
-     * Whether to log all topic messages
-     * @default false
-     */
-    logTopics: boolean;
-    /**
-     * Whether to log all service messages
-     * @default false
-     */
-    logServices: boolean;
 }
 
 // TODO: Block spoofed messages
@@ -79,13 +67,6 @@ export class TopicServer extends BaseClient<IServerClient> {
         }
     };
     /**
-     * Server options
-     */
-    private options: IServerOptions = {
-        logTopics: false,
-        logServices: false
-    };
-    /**
      * Extra channels the server handles with onRawEvent that are not topic or service channels
      */
     static metaChannels = ["id"]; // "id" channel is used to match socket IDs with client IDs. Clients will send their ID to the server on connect, and the server will match it with the socket ID.
@@ -94,13 +75,9 @@ export class TopicServer extends BaseClient<IServerClient> {
      * Creates a new TopicServer instance
      * @param server The socket server instance
      */
-    constructor(server: IServer, options?: Partial<IServerOptions>) {
-        super();
+    constructor(server: IServer, options?: Partial<IBaseClientOptions>) {
+        super(options);
         this.socket = server;
-        this.options = {
-            ...this.options,
-            ...options
-        }
         this.clientSockets = new Map(); // Map of client sockets
         this.channelHandlers = new Map(); // Map of socket event handlers (per channel)
         this.initialize();

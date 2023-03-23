@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { Channel, RequestType, ServiceChannel, ServiceResponseType, TopicChannel } from "./utils/Channel";
 import { TopicServer } from "./Server";
 import { diff, DiffResult, mergeDiff, RecursivePartial } from "./utils/Compare";
@@ -13,6 +13,29 @@ export const servicePrefix = "sv-";
 export const topicPrefix = "tp-";
 export const userPrefix = "us-";
 export const metaPrefix = "mt-";
+
+export interface IBaseClientOptions {
+    /**
+     * Whether to log all topic messages
+     * @default false
+     */
+    logTopics: boolean;
+    /**
+     * Whether to log all service messages
+     * @default false
+     */
+    logServices: boolean;
+    /**
+     * Whether to log topic validation errors
+     * @default false
+     */
+    logTopicValidationErrors: boolean;
+    /**
+     * Whether to log service validation errors
+     * @default false
+     */
+    logServiceValidationErrors: boolean;
+}
 
 export type OnReceiveTopicMessageArgs<T extends JSONValue, V = void> = {
     socket?: V;
@@ -82,6 +105,10 @@ export abstract class BaseClient<V = void> {
      */
     protected topicsValid: Map<string, boolean> = new Map();
     /**
+     * Map of topic channels and their latest reasons for being invalid
+     */
+    protected topicsInvalidReasons: Map<string, ZodError<any>> = new Map();
+    /**
      * Map of service channel names to their handlers
      */
     protected serviceHandlerMap: Map<string, (data: RequestType) => ServiceResponseType | Promise<ServiceResponseType>> = new Map();
@@ -101,6 +128,16 @@ export abstract class BaseClient<V = void> {
      * Map of topic to their last valid diffs and sources
      */
     protected lastValidDiffMap: Map<string, {diff: DiffResult<JSONValue, JSONValue>, source: string}> = new Map();
+
+    /**
+     * Options
+     */
+    public options: IBaseClientOptions = {
+        logTopics: false,
+        logServices: false,
+        logTopicValidationErrors: false,
+        logServiceValidationErrors: false
+    };
 
     // Abstract methods
 
@@ -123,8 +160,12 @@ export abstract class BaseClient<V = void> {
     /**
      * Create a new {@link BaseClient} instance
      */
-    constructor() {
+    constructor(options?: Partial<IBaseClientOptions>) {
         this._id = uuidv4();
+        this.options = {
+            ...this.options,
+            ...options
+        }
     }
 
     /**
@@ -504,37 +545,39 @@ export abstract class BaseClient<V = void> {
         const previouslyValid = this.topicsValid.get(eventName) ?? false;
         const parse = channel.schema.safeParse(newTopic);
         const valid = parse.success;
-        // if (!valid) {
-        //     console.log(`${this.id}: ❌ Topic ${channel.name} is invalid:`, parse.error);
-        // }
+        if (!valid) {
+            this.options.logTopicValidationErrors && console.log(`${this.id}: ❌ Topic ${channel.name} is invalid:`, parse.error);
+            this.topicsInvalidReasons.set(eventName, parse.error);
+        }
         // Throw an error indicating what the topic is invalid
         // Update the topic validity and value, and call the handler if it is valid and if there are any changes
         if (diffResult.modified !== undefined || diffResult.deleted !== undefined) {
-            // console.log("Previously valid: ", previouslyValid)
+            // this.options.logTopicValidationErrors && console.log("Previously valid: ", previouslyValid);
             if (previouslyValid !== true) {
                 if (valid) {
-                    // console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
+                    this.options.logTopicValidationErrors && console.log(`${this.id}: 🎊 Topic ${channel.name} is now valid, applying changes`);
                     this.topicsValid.set(eventName, true);
                     this.topicMap.set(eventName, newTopic);
                     this.updateTopic(eventName, newTopic, diffResult, msg);
                     // Instead, iterate over the handlers and their index as pairs, so we can create an unsubscribe function that removes the handler at the correct index
                 } else {
-                    // console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
+                    this.options.logTopicValidationErrors && console.log(`${this.id}: 🤔 Topic ${channel.name} is still invalid, but applying changes`);
                     // Still update the topic value, but don't call the handler
                     this.topicMap.set(eventName, newTopic);
                 }
             } else {
                 if (valid) {
-                    // console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
+                    this.options.logTopicValidationErrors && console.log(`${this.id}: 😀 Topic ${channel.name} is still valid, applying changes`);
                     // If previously valid and now is still valid, apply the changes
                     this.topicMap.set(eventName, newTopic);
                     this.updateTopic(eventName, newTopic, diffResult, msg);
                 } else {
-                    // console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
+                    this.options.logTopicValidationErrors && console.log(`${this.id}: 🚨 Topic ${channel.name} is invalid after changes, not applying changes`);
                     // If previously valid and now is invalid, don't apply the changes
                 }
             }
-            // console.log(`🧓 Old topic:`, currentTopic, `👶 New topic:`, newTopic, `📝 Diff:`, diffResult);
+            this.options.logTopicValidationErrors && console.log(`${this.id}: Topic ${channel.name} is now:`);
+            this.options.logTopicValidationErrors && console.dir(this.topicMap.get(eventName));
         }
     }
 
