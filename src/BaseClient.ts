@@ -577,8 +577,15 @@ export abstract class BaseClient<V = void> {
                     // If previously valid and now is invalid, don't apply the changes
                 }
             }
-            this.options.logTopicValidationErrors && console.log(`${this.id}: Topic ${channel.name} is now:`);
-            this.options.logTopicValidationErrors && console.dir(this.topicMap.get(eventName));
+            // Log previous, diff, and new topic
+            if (this.options.logTopicValidationErrors) {
+                console.log(`${this.id}: Processed diff for topic ${channel.name}:`);
+                console.log(diffResult);
+                console.log(`${this.id}: Topic ${channel.name} changed from:`);
+                console.log(currentTopic);
+                console.log(`${this.id}: into:`);
+                console.log(newTopic);
+            }
         }
     }
 
