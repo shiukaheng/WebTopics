@@ -852,22 +852,26 @@ export abstract class BaseClient<V = void> {
     // TODO: We need a way to unsubscribe from a topic soon, but for now we can just use this. This will leak memory if we repeatedly call it.
     /**
      * Gets a promise that resolves with the server ID
+     * @param timeout The timeout for the request (in ms)
      * @returns A promise that resolves with the server ID
      */
-    getServerID(): Promise<string> {
+    getServerID(timeout: number=10000): Promise<string> {
         return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
+            let unsub: Unsubscriber;
+            const timeoutFunc = setTimeout(() => {
                 reject(new Error("Server ID timed out"));
-            }, 10000);
+                unsub();
+            }, timeout);
             var resolved = false;
             const handler = (topic: ServerMeta) => {
                 if (topic.serverID !== undefined && !resolved) {
                     resolved = true;
-                    clearTimeout(timeout);
+                    clearTimeout(timeoutFunc);
                     resolve(topic.serverID);
+                    unsub();
                 }
             }
-            this.sub(serverMetaChannel, handler);
+            unsub = this.sub(serverMetaChannel, handler);
         });
     }
 
@@ -900,5 +904,7 @@ export abstract class BaseClient<V = void> {
         for (const channel of this.initializedTopicChannels) {
             this.resetTopic(channel);
         }
+        // Reset serverMetaChannel
+        this.resetTopic(serverMetaChannel);
     }
 }
