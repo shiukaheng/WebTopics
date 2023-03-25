@@ -29,6 +29,10 @@ export class TopicClient extends BaseClient {
         this.socket.on("connect", () => {
             this.socket.emit("id", this._id); // Send the ID to the server, so it can match the SocketIO client ID with the TopicClient ID
         });
+        this.socket.on("disconnect", () => {
+            // When the socket disconnects, reset all topics
+            this.resetAllTopics();
+        })
     }
     /**
      * Implementation of onRawEvent to allow the TopicClient to listen to events

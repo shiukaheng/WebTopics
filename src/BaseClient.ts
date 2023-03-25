@@ -177,6 +177,24 @@ export abstract class BaseClient<V = void> {
         }
     }
 
+    private generateOwnServerMeta(): Partial<ServerMeta> {
+        const services: Record<string, {schema: {}, responseSchema?: {}}> = {};
+        for (const channel of this.initializedServiceChannels) {
+            services[channel.name] = {
+                schema: zodToJsonSchema(channel.schema),
+                responseSchema: (channel.responseSchema === undefined) ? undefined : zodToJsonSchema(channel.responseSchema)
+            }
+        }
+        const wrapped: Partial<ServerMeta> = {
+            clients: {
+                [this._id]: {
+                    services: services
+                }
+            }
+        }
+        return wrapped;
+    }
+
     /**
      * Initalize the client by subscribing to the server meta channel, and publishing the client's meta data to the server
      */
@@ -428,18 +446,9 @@ export abstract class BaseClient<V = void> {
                 console.warn(`Invalid message received for service channel ${channel.name}:`, msg);
             });
             // Publish to serverMetaChannel that we are serving this channel
-            this.pub(serverMetaChannel, {
-                clients: {
-                    [this._id]: {
-                        services: {
-                            [channel.name]: {
-                                schema: zodToJsonSchema(channel.schema),
-                                responseSchema: (channel.responseSchema === undefined) ? undefined : zodToJsonSchema(channel.responseSchema)
-                            }
-                        }
-                    }
-                }
-            }, true, false);
+            this.pub(serverMetaChannel, 
+                this.generateOwnServerMeta(),
+                true, false);  // Currently disallows unpublishing of services
             this.initializedServiceChannels.add(channel);
         }
     }
@@ -502,6 +511,7 @@ export abstract class BaseClient<V = void> {
                 sentResponse = true;
                 console.error(`Error in service handler for ${channel.name}:`, e);
                 this.sendServiceErrorMessage(channel, msg.serviceId, JSON.stringify(e), msg.source);
+                return;
             }
             // If the result is a promise, wait for it to resolve
             if (result instanceof Promise) {
@@ -866,5 +876,29 @@ export abstract class BaseClient<V = void> {
      */
     get id(): string {
         return this._id;
+    }
+
+    /**
+     * Resets a topic channel's value to an empty object
+     * @param channel The channel to reset
+     */
+    resetTopic<T extends JSONValue>(channel: TopicChannel<T>) {
+        const channelName = this.getChannelName(channel);
+        if (channel.mode !== "topic") {
+            throw new Error("Channel is not a topic channel");
+        }
+        this.topicMap.set(channelName, {});
+        this.topicsValid.set(channelName, false);
+    }
+
+    /**
+     * Resets all topic channels' values to an empty object
+     * @param channel The channel to reset
+     */
+    resetAllTopics() {
+        // Run resetTopic on all topics in set .initializedTopicChannels
+        for (const channel of this.initializedTopicChannels) {
+            this.resetTopic(channel);
+        }
     }
 }
