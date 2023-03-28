@@ -667,7 +667,7 @@ export abstract class BaseClient<V = void> {
      * @param source Optional source of the update (Only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
     pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf: boolean=true, publishDeletes: boolean=true, source?: string): void {
-        if (publishDeletes) {
+        if (publishDeletes && channel.name === "serverMeta") {
             this.sendDiffTopic(channel as TopicChannel<T>, {
                 modified: data,
                 // @ts-ignore hack
