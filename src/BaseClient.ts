@@ -96,7 +96,7 @@ export abstract class BaseClient<V = void> {
     /**
      * Map of topic channel names to a list of change handlers 
      */
-    protected topicHandlerMap: Map<string, (Subscriber<JSONValue>)[]> = new Map();
+    protected topicHandlerMap: Map<string, Set<Subscriber<JSONValue>>> = new Map();
     /**
      * Map of topic channel names to their current values
      */
@@ -335,11 +335,15 @@ export abstract class BaseClient<V = void> {
      * @returns The unsubscriber function
      */
     sub<T extends JSONValue>(channel: TopicChannel<T>, handler: Subscriber<T>, initialUpdate: boolean = true): Unsubscriber {
+        // console.log(`Client ${this.id} subscribing to channel ${channel.name}`);
         if (channel.mode !== "topic") throw new Error("Channel is not a topic channel");
         this.initTopicChannel<T>(channel);
         const eventName = this.getChannelName(channel);
-        this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
+        // this.topicHandlerMap.get(eventName)?.push(handler as (topic: JSONValue) => void);
+        // It is now a set, so we don't need to check if it exists
+        this.topicHandlerMap.get(eventName)!.add(handler as (topic: JSONValue) => void);
         const unsubscriber = this.createUnsubscriber(eventName, handler);
+        // console.log(initialUpdate, this.hasValidTopic(channel));
         if (initialUpdate && this.hasValidTopic(channel)) {
             // Manually call the handler with the current topic value
             const history = this.lastValidDiffMap.get(eventName);
@@ -374,7 +378,8 @@ export abstract class BaseClient<V = void> {
             this.channelSchemaMap.set(eventName, channel.schema);
             this.topicMap.set(eventName, {});
             if (this.topicHandlerMap.has(eventName) === false) {
-                this.topicHandlerMap.set(eventName, []);
+                // this.topicHandlerMap.set(eventName, []);
+                this.topicHandlerMap.set(eventName, new Set());
             }
             // Add raw event listener
             this.onRawEvent(eventName, (msg: MessageMeta, sender?: V) => {
@@ -614,10 +619,12 @@ export abstract class BaseClient<V = void> {
             // Remove this handler from the list of handlers
             const handlers = this.topicHandlerMap.get(eventName);
             if (handlers !== undefined) {
-                const index = handlers.indexOf(handler as Subscriber<JSONValue>);
-                if (index > -1) {
-                    handlers.splice(index, 1);
-                }
+                // const index = handlers.indexOf(handler as Subscriber<JSONValue>);
+                // if (index > -1) {
+                //     handlers.splice(index, 1);
+                // }
+                // It is now a set, so we can just delete the handler
+                handlers.delete(handler as Subscriber<JSONValue>);
             }
         };
     }
@@ -795,7 +802,7 @@ export abstract class BaseClient<V = void> {
         if (currentTopic === undefined) {
             throw new Error(`Topic ${channel.name} not found`);
         }
-        console.log(this.topicMap);
+        // console.log(this.topicMap);
         if (!this.topicsValid.get(channelName)) {
             throw new Error("Topic is not valid");
         }
@@ -858,17 +865,20 @@ export abstract class BaseClient<V = void> {
     getServerID(timeout: number=10000): Promise<string> {
         return new Promise((resolve, reject) => {
             let unsub: Unsubscriber;
-            const timeoutFunc = setTimeout(() => {
+            const timeoutFunc = setTimeout(() => { // Create a timeout in the case that the server ID is never received
                 reject(new Error("Server ID timed out"));
                 unsub();
             }, timeout);
-            var resolved = false;
-            const handler = (topic: ServerMeta) => {
+            var resolved = false; // By default, we have not resolved the promise
+            const handler = (topic: ServerMeta) => { // Handler for getting updates on the server meta topic
+                // console.log(`${i}, ${topic.serverID}, ${resolved}`)
                 if (topic.serverID !== undefined && !resolved) {
-                    resolved = true;
-                    clearTimeout(timeoutFunc);
-                    resolve(topic.serverID);
-                    unsub();
+                    // If the serverID is not set, and its not resolved and we get an update,
+                    // It implies that the server ID has been set
+                    resolved = true; // Set resolved to true
+                    clearTimeout(timeoutFunc); // Clear the timeout
+                    resolve(topic.serverID); // Resolve the promise
+                    unsub(); // Unsubscribe from the topic
                 }
             }
             unsub = this.sub(serverMetaChannel, handler);

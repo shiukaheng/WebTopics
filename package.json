@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "majestic",
-    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev": "nodemon --exec ts-node src/dev.ts",
     "dev-manual-test": "nodemon --exec ts-node src/dummy_server.ts",
     "build": "rimraf ./build && tsc",
     "build-docs": "typedoc",
