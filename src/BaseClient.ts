@@ -719,6 +719,38 @@ export abstract class BaseClient<V = void> {
         }
     }
 
+    /**
+     * Publishes a raw diff to a topic channel by broadcasting the diff
+     * @param channel The channel to publish to
+     * @param diff The diff to publish
+     * @param updateSelf Whether to call the client's own topic subscribers
+     * @param source Optional source of the update (Only used on {@link TopicServer} for broadcasting / forwarding messages)
+     */
+    pubDiff<T extends JSONValue>(channel: TopicChannel<T>, diff: DiffResult<T, T>, updateSelf: boolean=true, source?: string): void {
+        if (channel.mode !== "topic") {
+            throw new Error("Channel is not a topic channel");
+        }
+        if (diff === undefined) {
+            throw new Error("Data is undefined, which is equivalent to deleting the topic. Invalid operation.");
+        }
+        this.initTopicChannel(channel);
+
+        const eventName = this.getChannelName(channel);
+        const currentTopic = this.topicMap.get(eventName);
+        if (currentTopic === undefined) {
+            throw new Error("Channel not found");
+        }
+        // Apply the changes to the topic
+        const newTopic = mergeDiff(currentTopic, diff);
+        this.topicMap.set(eventName, newTopic);
+        this.sendDiffTopic(channel as TopicChannel<T>, diff as DiffResult<T, T>, source); 
+        if (updateSelf) {
+            // this.topicHandlerMap.get(eventName)?.forEach(handler => handler(newTopic));
+            // Send yourself the message, so that it runs through the same logic as if it was received from another client
+            this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diff as JSONObject, "topic", source ?? this._id) as WithMeta<TopicMessage>)
+        }
+    }
+
 
     /**
      * Sends a service request to the specified destination
