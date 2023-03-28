@@ -8,6 +8,7 @@ import { BaseClient, IBaseClientOptions, Unsubscriber } from "./BaseClient";
 export interface IClient {
     on(event: string, listener: (data: any) => void): void;
     emit(event: string, data: any): void;
+    disconnect(): void;
 }
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
@@ -88,5 +89,8 @@ export class TopicClient extends BaseClient {
     protected setConnectionStatus(status: ConnectionStatus): void {
         this.connectionStatus = status;
         this.connectionStatusListeners.forEach(listener => listener(status));
+    }
+    disconnect(): void {
+        this.socket.disconnect();
     }
 }
