@@ -667,6 +667,25 @@ export abstract class BaseClient<V = void> {
      * @param source Optional source of the update (Only used on {@link TopicServer} for broadcasting / forwarding messages)
      */
     pub<T extends JSONValue>(channel: TopicChannel<T>, data: RecursivePartial<T>, updateSelf: boolean=true, publishDeletes: boolean=true, source?: string): void {
+        if (publishDeletes) {
+            this.sendDiffTopic(channel as TopicChannel<T>, {
+                modified: data,
+                // @ts-ignore hack
+                deleted: {clients: null}
+            }, source);
+            if (updateSelf) {
+                // this.onReceiveTopicMessage(channel as TopicChannel<T>, this.wrapMessage(diffResult as JSONObject, "topic", source ?? this._id) as WithMeta<TopicMessage>)
+                this.onReceiveTopicMessage(channel as TopicChannel<T>, 
+                    this.wrapMessage({
+                        // @ts-ignore hack
+                        modified: data,
+                        // @ts-ignore hack
+                        deleted: {clients: null}
+                    }, "topic", source ?? this._id) as WithMeta<TopicMessage>
+                )
+            }
+        }
+        // console.log('👾', data, publishDeletes)
         data = cloneDeep(data);
         if (channel.mode !== "topic") {
             throw new Error("Channel is not a topic channel");
